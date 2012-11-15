@@ -43,6 +43,10 @@ type Hoard struct {
 // caching system, as well as an optional expiration set
 type HoardFunc func() (interface{}, *Expiration)
 
+// HoardFuncWithError is a type for the function signature used to place data into the 
+// caching system, as well as an optional expiration set
+type HoardFuncWithError func() (interface{}, error, *Expiration)
+
 // StartFlushManager starts the ticker to check for expired entries and
 // flushes those that are expired
 func (h *Hoard) StartFlushManager() {
@@ -150,6 +154,43 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 	}
 
 	return data
+
+}
+
+// GetWithError does the same as Get, but handles error cases. If an error is
+// encountered, it does not cache anything and returns the error.
+func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithError) (interface{}, error) {
+
+	var data interface{}
+	object, ok := h.cacheGet(key)
+
+	if !ok {
+		if len(hoardFuncWithError) == 0 {
+			return nil, nil
+		}
+
+		var expiration *Expiration
+		var err error
+
+		data, err, expiration = hoardFuncWithError[0]()
+
+		if err != nil {
+			return nil, err
+		}
+
+		if expiration == nil {
+			expiration = h.defaultExpiration
+		}
+
+		h.Set(key, data, expiration)
+
+	} else {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+	}
+
+	return data, nil
 
 }
 

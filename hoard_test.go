@@ -3,6 +3,7 @@ package hoard
 import (
 	//"github.com/stretchrcom/testify/assert"
 
+	"errors"
 	"github.com/stretchrcom/testify/assert"
 	"math/rand"
 	"testing"
@@ -60,6 +61,26 @@ func TestHoard_Get(t *testing.T) {
 
 	assert.NotEqual(t, result, "second")
 	assert.False(t, secondCalled)
+
+}
+
+func TestHoard_GetWithError(t *testing.T) {
+
+	h := MakeHoard(ExpiresNever)
+
+	result, err := h.GetWithError("key", func() (interface{}, error, *Expiration) {
+		return "first", nil, ExpiresNever
+	})
+
+	assert.Equal(t, result, "first")
+	assert.Nil(t, err)
+
+	result, err = h.GetWithError("key2", func() (interface{}, error, *Expiration) {
+		return "second", errors.New("EXTERMINATE!!!"), ExpiresNever
+	})
+
+	assert.Nil(t, result)
+	assert.NotNil(t, err)
 
 }
 
