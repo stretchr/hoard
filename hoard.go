@@ -117,13 +117,20 @@ func MakeHoard(defaultExpiration *Expiration) *Hoard {
 * 2. If the key is not in the cache:
 *	a. It retrieves the object and expiration properties from the hoardFunc
 *	b. It creates a container object in which to store the data and metadata
-*	c. It stores the new container in the cache */
-func (h *Hoard) Get(key string, hoardFunc HoardFunc) interface{} {
+*	c. It stores the new container in the cache
+*
+* If no hoardfunc is passed and the key is not in the cache, returns nil.
+* Only the first hoardFunc is used. All others will be ignored */
+func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 
 	item, ok := h.cacheGet(key)
 
 	if !ok {
-		data, expiration := hoardFunc()
+		if len(hoardFunc) == 0 {
+			return nil
+		}
+
+		data, expiration := hoardFunc[0]()
 
 		if expiration == nil {
 			expiration = h.defaultExpiration
