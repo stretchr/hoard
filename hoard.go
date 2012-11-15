@@ -254,8 +254,8 @@ func (h *Hoard) Has(key string) bool {
 
 }
 
-// Expire removes the item with the specified key from the map.
-func (h *Hoard) Expire(key string) {
+// Remove removes the item with the specified key from the map.
+func (h *Hoard) Remove(key string) {
 	h.cacheDeadbolt.Lock()
 	delete(h.cache, key)
 	h.cacheDeadbolt.Unlock()

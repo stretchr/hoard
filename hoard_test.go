@@ -82,7 +82,7 @@ func TestHoard_GetWithError(t *testing.T) {
 
 }
 
-func TestHoard_Expire(t *testing.T) {
+func TestHoard_Remove(t *testing.T) {
 
 	h := MakeHoard(ExpiresNever)
 
@@ -92,7 +92,7 @@ func TestHoard_Expire(t *testing.T) {
 
 	assert.Equal(t, 1, h.Get("something"))
 
-	h.Expire("something")
+	h.Remove("something")
 	assert.Equal(t, 2, h.Get("something", func() (interface{}, *Expiration) { return 2, nil }))
 
 }
