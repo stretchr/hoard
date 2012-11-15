@@ -141,6 +141,14 @@ func (h *Hoard) Get(key string, hoardFunc HoardFunc) interface{} {
 
 }
 
+// Has determines whether 
+func (h *Hoard) Has(key string) bool {
+
+	_, ok := h.cache[key]
+	return ok
+
+}
+
 // Expire removes the item from the map
 func (h *Hoard) Expire(item container) {
 
@@ -151,15 +159,19 @@ func (h *Hoard) Expire(item container) {
 
 // cacheGet retrieves an item from the cache atomically
 func (h *Hoard) cacheGet(key string) (container, bool) {
+
 	h.deadbolt.RLock()
 	item, ok := h.cache[key]
 	h.deadbolt.RUnlock()
 	return item, ok
+
 }
 
 // cacheSet sets an item in the cache atomically
 func (h *Hoard) cacheSet(key string, item container) {
+
 	h.deadbolt.Lock()
 	h.cache[key] = item
 	h.deadbolt.Unlock()
+
 }

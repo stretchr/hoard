@@ -87,6 +87,16 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 }
 
+func TestHoard_Has(t *testing.T) {
+	h := MakeHoard(ExpiresNever)
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresNever
+	})
+
+	assert.True(t, h.Has("key"))
+}
+
 // The below functions take forever to run as they wait for expirations to tick
 // They are commented out to speed up development
 /*func TestHoard_IdleExpiration(t *testing.T) {
