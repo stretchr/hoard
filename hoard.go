@@ -173,6 +173,10 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 		data = object.data
 		object.accessed = time.Now()
 		h.cacheSet(key, object)
+
+		if object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
 	}
 
 	return data
@@ -210,6 +214,10 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 		data = object.data
 		object.accessed = time.Now()
 		h.cacheSet(key, object)
+
+		if object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
 	}
 
 	return data, nil
@@ -251,22 +259,39 @@ func (h *Hoard) Expire(key string) {
 	h.cacheDeadbolt.Lock()
 	delete(h.cache, key)
 	h.cacheDeadbolt.Unlock()
+	h.expireInternal(key)
+}
+
+// expireInternal removes the item with the specified key from the expiration cache.
+func (h *Hoard) expireInternal(key string) {
+	h.expirationDeadbolt.Lock()
+	delete(h.expirationCache, key)
+	h.expirationDeadbolt.Unlock()
 }
 
 // SetExpires updates the expiration policy for the object of the
 // specified key.
+// 
+// If the expiration is ExpiresNever, removes this item from the 
+// expirationCache
 func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 
-	item, ok := h.cacheGet(key)
+	object, ok := h.cacheGet(key)
 	if !ok {
 		return false
 	}
 
 	// update the expiration policy
-	item.expiration = expiration
+	object.expiration = expiration
 
-	// set the item back in the cache
-	h.cacheSet(key, item)
+	// set the object back in the cache
+	h.cacheSet(key, object)
+
+	if expiration == ExpiresNever {
+		h.expireInternal(key)
+	} else {
+		h.expirationCacheSet(key, object)
+	}
 
 	return true
 

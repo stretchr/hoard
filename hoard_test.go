@@ -360,7 +360,7 @@ func BenchmarkHoard_AddingExpiring(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = h.Get(string(i), func() (interface{}, *Expiration) {
 			expiration := new(Expiration)
-			expiration.AfterSeconds(int64(rand.Int() % 10))
+			expiration.AfterSeconds(int64(rand.Int() % 2))
 			return 1, ExpiresNever
 		})
 	}
