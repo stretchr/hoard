@@ -17,7 +17,7 @@ func TestHoard_MakeHoard(t *testing.T) {
 	}
 
 	e := new(Expiration)
-	e.ExpiresAfterSeconds(1)
+	e.AfterSeconds(1)
 
 	h = MakeHoard(e)
 	if assert.NotNil(t, h) {
@@ -68,9 +68,9 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 	result := h.Get("key2", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
-		expiration.ExpiresAfterSecondsIdle(10)
-		expiration.ExpiresAfterSeconds(10)
-		expiration.ExpiresOnCondition(func() bool {
+		expiration.AfterSecondsIdle(10)
+		expiration.AfterSeconds(10)
+		expiration.OnCondition(func() bool {
 			return true
 		})
 		return "second", expiration
@@ -236,7 +236,7 @@ func BenchmarkHoard_AddingExpiring(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = h.Get(string(i), func() (interface{}, *Expiration) {
 			expiration := new(Expiration)
-			expiration.ExpiresAfterSeconds(int64(rand.Int() % 10))
+			expiration.AfterSeconds(int64(rand.Int() % 10))
 			return 1, ExpiresNever
 		})
 	}
