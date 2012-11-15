@@ -42,7 +42,7 @@ But Hoard's `Get` method also provides a nicer alternative to remove a lot of co
 ####With errors
 For the common case of methods that return an optional error as the second argument, Hoard provides the `GetWithError` alternative that works as you might expect:
 
-    func GetSomething() *Something {
+    func GetSomething() (*Something, error) {
 
       obj, err := hoard.SharedHoard().GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
     	
