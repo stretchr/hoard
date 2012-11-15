@@ -173,12 +173,31 @@ func (h *Hoard) Has(key string) bool {
 
 }
 
-// Expire removes the object from the map
-func (h *Hoard) Expire(object container) {
-
+// Expire removes the item with the specified key from the map.
+func (h *Hoard) Expire(key string) {
 	h.deadbolt.Lock()
-	delete(h.cache, object.key)
+	delete(h.cache, key)
 	h.deadbolt.Unlock()
+}
+
+// SetExpires updates the expiration policy for the object of the
+// specified key.
+func (h *Hoard) SetExpires(key string, expiration *Expiration) *Hoard {
+
+	item, ok := h.cacheGet(key)
+	if !ok {
+		panic("hoard: Cannot call SetExpires when no item exists for that key.")
+	}
+
+	// update the expiration policy
+	item.expiration = expiration
+
+	// set the item back in the cache
+	h.cacheSet(key, item)
+
+	// chain
+	return h
+
 }
 
 // cacheGet retrieves an object from the cache atomically
@@ -188,7 +207,6 @@ func (h *Hoard) cacheGet(key string) (container, bool) {
 	object, ok := h.cache[key]
 	h.deadbolt.RUnlock()
 	return object, ok
-
 }
 
 // cacheSet sets an object in the cache atomically

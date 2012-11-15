@@ -6,6 +6,7 @@ import (
 	"github.com/stretchrcom/testify/assert"
 	"math/rand"
 	"testing"
+	"time"
 )
 
 func TestHoard_MakeHoard(t *testing.T) {
@@ -59,6 +60,51 @@ func TestHoard_Get(t *testing.T) {
 
 	assert.NotEqual(t, result, "second")
 	assert.False(t, secondCalled)
+
+}
+
+func TestHoard_Expire(t *testing.T) {
+
+	h := MakeHoard(ExpiresNever)
+
+	h.Get("something", func() (interface{}, *Expiration) {
+		return 1, nil
+	})
+
+	assert.Equal(t, 1, h.Get("something"))
+
+	h.Expire("something")
+	assert.Equal(t, 2, h.Get("something", func() (interface{}, *Expiration) { return 2, nil }))
+
+}
+
+func TestHoard_SetExpires(t *testing.T) {
+
+	date := time.Now()
+
+	h := MakeHoard(ExpiresNever)
+	h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresNever
+	})
+
+	assert.Equal(t, ExpiresNever, h.cache["key"].expiration)
+	assert.Equal(t, h, h.SetExpires("key", Expires().OnDate(date)), "SetExpires should chain")
+
+	item, _ := h.cacheGet("key")
+	if assert.NotNil(t, &item) {
+		if assert.NotNil(t, item.expiration, "Expiration should be set") {
+			assert.Equal(t, date, item.expiration.absolute)
+		}
+	}
+
+}
+
+func TestHoard_SetExpires_Panics(t *testing.T) {
+
+	h := MakeHoard(ExpiresNever)
+	assert.Panics(t, func() {
+		h.SetExpires("key", Expires().OnDate(time.Now()))
+	}, "Should panic if no key matches")
 
 }
 
