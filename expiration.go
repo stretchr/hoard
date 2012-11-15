@@ -33,6 +33,27 @@ func Expires() *Expiration {
 	return new(Expiration)
 }
 
+// IsExpired determines if an expiration object has expired
+func (e *Expiration) IsExpired(lastAccess, currentTime time.Time) bool {
+	if e.idle != 0 {
+		if currentTime.Sub(lastAccess) >
+			e.idle {
+			return true
+		}
+	}
+	if !e.absolute.IsZero() {
+		if currentTime.After(e.absolute) {
+			return true
+		}
+	}
+	if e.condition != nil {
+		if e.condition() {
+			return true
+		}
+	}
+	return false
+}
+
 // after does the work for each After* function
 func (e *Expiration) after(duration int64, multiplier time.Duration) time.Time {
 	return time.Now().Add(time.Duration(duration) * multiplier)

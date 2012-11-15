@@ -62,22 +62,8 @@ func (h *Hoard) StartFlushManager() {
 				for key, value := range h.cache {
 
 					if value.expiration != nil {
-
-						if value.expiration.idle != 0 {
-							if currentTime.Sub(value.accessed) >
-								value.expiration.idle {
-								expirations = append(expirations, key)
-							}
-						}
-						if !value.expiration.absolute.IsZero() {
-							if currentTime.After(value.expiration.absolute) {
-								expirations = append(expirations, key)
-							}
-						}
-						if value.expiration.condition != nil {
-							if value.expiration.condition() {
-								expirations = append(expirations, key)
-							}
+						if value.expiration.IsExpired(value.accessed, currentTime) {
+							expirations = append(expirations, key)
 						}
 					}
 				}
