@@ -46,21 +46,21 @@ For the common case of methods that return an optional error as the second argum
 
       obj, err := hoard.SharedHoard().GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
     	
-    	// get the object and return it
-    	obj, err := SomeExpensiveMethodToGetTheObject()
-    	
-    	// return the object (and tell it to never expire)
-    	return obj, err, hoard.ExpiresNever
-    	
+      	// get the object and return it
+      	obj, err := SomeExpensiveMethodToGetTheObject()
+      	
+      	// return the object (and tell it to never expire)
+      	return obj, err, hoard.ExpiresNever
+      	
       })
       
       // did it return an error?
       if err != nil {
-      	return nil, err, hoard.ExpiresNever
+      	return nil, err
       }
       
       // all is well
-      return obj, nil, hoard.ExpiresNever
+      return obj, nil
 
     }
 
