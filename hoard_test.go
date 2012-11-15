@@ -71,7 +71,7 @@ func TestHoard_Expire(t *testing.T) {
 		return 1, nil
 	})
 
-	assert.Equal(t, 1, h.Get("something", func() (interface{}, *Expiration) { return nil, nil }))
+	assert.Equal(t, 1, h.Get("something"))
 
 	h.Expire("something")
 	assert.Equal(t, 2, h.Get("something", func() (interface{}, *Expiration) { return 2, nil }))
