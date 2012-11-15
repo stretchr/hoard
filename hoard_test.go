@@ -63,6 +63,21 @@ func TestHoard_Get(t *testing.T) {
 
 }
 
+func TestHoard_Expire(t *testing.T) {
+
+	h := MakeHoard(ExpiresNever)
+
+	h.Get("something", func() (interface{}, *Expiration) {
+		return 1, nil
+	})
+
+	assert.Equal(t, 1, h.Get("something", func() (interface{}, *Expiration) { return nil, nil }))
+
+	h.Expire("something")
+	assert.Equal(t, 2, h.Get("something", func() (interface{}, *Expiration) { return 2, nil }))
+
+}
+
 func TestHoard_SetExpires(t *testing.T) {
 
 	date := time.Now()

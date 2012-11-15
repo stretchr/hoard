@@ -141,11 +141,10 @@ func (h *Hoard) Get(key string, hoardFunc HoardFunc) interface{} {
 
 }
 
-// Expire removes the item from the map
-func (h *Hoard) Expire(item container) {
-
+// Expire removes the item with the specified key from the map.
+func (h *Hoard) Expire(key string) {
 	h.deadbolt.Lock()
-	delete(h.cache, item.key)
+	delete(h.cache, key)
 	h.deadbolt.Unlock()
 }
 
