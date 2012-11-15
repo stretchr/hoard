@@ -19,7 +19,7 @@ type container struct {
 	// accessed is the time this entry was last accessed
 	accessed time.Time
 
-	// expiration holds the expiration properties for this item
+	// expiration holds the expiration properties for this object
 	expiration *Expiration
 }
 
@@ -112,7 +112,9 @@ func MakeHoard(defaultExpiration *Expiration) *Hoard {
 
 }
 
-/* Get performs several functions:
+/* Get is the most concise way to put data into the cache. However, it only
+* works when a single possible return value exists. Otherwise, use Set.
+* This method performs several functions:
 * 1. If the key is in cache, it returns the object immediately
 * 2. If the key is not in the cache:
 *	a. It retrieves the object and expiration properties from the hoardFunc
@@ -123,62 +125,77 @@ func MakeHoard(defaultExpiration *Expiration) *Hoard {
 * Only the first hoardFunc is used. All others will be ignored */
 func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 
-	item, ok := h.cacheGet(key)
+	var data interface{}
+	object, ok := h.cacheGet(key)
 
 	if !ok {
 		if len(hoardFunc) == 0 {
 			return nil
 		}
 
-		data, expiration := hoardFunc[0]()
+		var expiration *Expiration
+
+		data, expiration = hoardFunc[0]()
 
 		if expiration == nil {
 			expiration = h.defaultExpiration
 		}
 
-		item = container{key, data, time.Now(), time.Now(), expiration}
-		h.cacheSet(key, item)
+		h.Set(key, data, expiration)
 
 	} else {
-		item.accessed = time.Now()
-		h.cacheSet(key, item)
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
 	}
 
-	return item.data
+	return data
 
+}
+
+// Set stores an object in cache for the given key
+func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
+	var exp *Expiration
+	if len(expiration) == 0 {
+		exp = ExpiresNever
+	} else {
+		exp = expiration[0]
+	}
+	containerObject := container{key, object, time.Now(), time.Now(), exp}
+	h.cacheSet(key, containerObject)
 }
 
 // Has determines whether 
 func (h *Hoard) Has(key string) bool {
 
-	_, ok := h.cache[key]
+	_, ok := h.cacheGet(key)
 	return ok
 
 }
 
-// Expire removes the item from the map
-func (h *Hoard) Expire(item container) {
+// Expire removes the object from the map
+func (h *Hoard) Expire(object container) {
 
 	h.deadbolt.Lock()
-	delete(h.cache, item.key)
+	delete(h.cache, object.key)
 	h.deadbolt.Unlock()
 }
 
-// cacheGet retrieves an item from the cache atomically
+// cacheGet retrieves an object from the cache atomically
 func (h *Hoard) cacheGet(key string) (container, bool) {
 
 	h.deadbolt.RLock()
-	item, ok := h.cache[key]
+	object, ok := h.cache[key]
 	h.deadbolt.RUnlock()
-	return item, ok
+	return object, ok
 
 }
 
-// cacheSet sets an item in the cache atomically
-func (h *Hoard) cacheSet(key string, item container) {
+// cacheSet sets an object in the cache atomically
+func (h *Hoard) cacheSet(key string, object container) {
 
 	h.deadbolt.Lock()
-	h.cache[key] = item
+	h.cache[key] = object
 	h.deadbolt.Unlock()
 
 }

@@ -87,6 +87,16 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 }
 
+func TestHoard_Set(t *testing.T) {
+
+	h := MakeHoard(ExpiresNever)
+
+	h.Set("key", 1)
+
+	assert.Equal(t, 1, h.Get("key"))
+
+}
+
 func TestHoard_Has(t *testing.T) {
 	h := MakeHoard(ExpiresNever)
 
