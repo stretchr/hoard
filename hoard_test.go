@@ -109,7 +109,8 @@ func TestHoard_SetExpires(t *testing.T) {
 	})
 
 	assert.Equal(t, ExpiresNever, h.cache["key"].expiration)
-	assert.Equal(t, h, h.SetExpires("key", Expires().OnDate(date)), "SetExpires should chain")
+
+	h.SetExpires("key", Expires().OnDate(date))
 
 	item, _ := h.cacheGet("key")
 	if assert.NotNil(t, &item) {
@@ -123,9 +124,7 @@ func TestHoard_SetExpires(t *testing.T) {
 func TestHoard_SetExpires_Panics(t *testing.T) {
 
 	h := MakeHoard(ExpiresNever)
-	assert.Panics(t, func() {
-		h.SetExpires("key", Expires().OnDate(time.Now()))
-	}, "Should panic if no key matches")
+	assert.False(t, h.SetExpires("key", Expires().OnDate(time.Now())))
 
 }
 

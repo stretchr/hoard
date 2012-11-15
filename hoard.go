@@ -223,11 +223,11 @@ func (h *Hoard) Expire(key string) {
 
 // SetExpires updates the expiration policy for the object of the
 // specified key.
-func (h *Hoard) SetExpires(key string, expiration *Expiration) *Hoard {
+func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 
 	item, ok := h.cacheGet(key)
 	if !ok {
-		panic("hoard: Cannot call SetExpires when no item exists for that key.")
+		return false
 	}
 
 	// update the expiration policy
@@ -236,8 +236,7 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) *Hoard {
 	// set the item back in the cache
 	h.cacheSet(key, item)
 
-	// chain
-	return h
+	return true
 
 }
 
