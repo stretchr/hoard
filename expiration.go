@@ -63,6 +63,7 @@ func (e *Expiration) ExpiresOnDate(date time.Time) {
 }
 
 // ExpiresOnCondition expires the item if the "condition" func returns true
+// TODO: describe WHEN this is checked (i.e. after every Get?)
 func (e *Expiration) ExpiresOnCondition(condition ExpirationFunc) {
 	e.condition = condition
 }
