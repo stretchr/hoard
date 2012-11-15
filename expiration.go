@@ -5,12 +5,13 @@ import (
 )
 
 // ExpirationFunc is a type for the function signature of a custom expiration
-// function
+// function.
 type ExpirationFunc func() bool
 
-// ExpiresNever is a facade for readability purposes
+// ExpiresNever is an Expiration that indicates the objects never expire.
 var ExpiresNever *Expiration = nil
 
+// Expiration describes when an object or objects will expire.
 type Expiration struct {
 	// idle is the sliding window for expiration in nanoseconds
 	idle time.Duration
