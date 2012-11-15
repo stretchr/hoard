@@ -60,7 +60,7 @@ For the common case of methods that return an optional error as the second argum
       }
       
       // all is well
-      return obj, nil
+      return obj.(*Something), nil
 
     }
 
@@ -82,24 +82,16 @@ If you are using the special `Get` alternative, then you return the `Expiration`
 
     func GetSomething() *Something {
 
-      obj, err := hoard.SharedHoard().GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
+      return hoard.SharedHoard().Get("my-key", func() (interface{}, *hoard.Expiration) {
     	
-    	// get the object and return it
-    	obj, err := SomeExpensiveMethodToGetTheObject()
+    	  // get the object and return it
+    	  obj, err := SomeExpensiveMethodToGetTheObject()
     	
-    	// return the object (and tell it to never expire)
-    	return obj, err, hoard.ExpiresNever
+    	  // return the object (and tell it to never expire)
+    	  return obj, err, hoard.ExpiresNever
     	
-      })
-      
-      // did it return an error?
-      if err != nil {
-      	return nil, err, hoard.ExpiresNever
-      }
-      
-      // all is well
-      return obj, nil, hoard.Expires().AfterSeconds(20)
-
+      }).(*Something)
+    
     }
 
 ##`SharedHoard` and your own Hoards
