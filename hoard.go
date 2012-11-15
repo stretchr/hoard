@@ -1,7 +1,6 @@
 package hoard
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -107,7 +106,6 @@ var initOnce sync.Once
 func SharedHoard() *Hoard {
 
 	initOnce.Do(func() {
-		fmt.Println("shared init")
 		sharedHoard = MakeHoard(ExpiresNever)
 	})
 

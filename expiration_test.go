@@ -29,9 +29,15 @@ func TestAfterSeconds(t *testing.T) {
 
 	e := Expires().AfterSeconds(2)
 	assert.NotNil(t, e)
-	assert.Condition(t, func() bool {
-		return !e.absolute.IsZero()
-	})
+	assert.False(t, e.absolute.IsZero())
+
+}
+
+func TestAfterMinutes(t *testing.T) {
+
+	e := Expires().AfterMinutes(2)
+	assert.NotNil(t, e)
+	assert.False(t, e.absolute.IsZero())
 
 }
 
@@ -39,9 +45,7 @@ func TestAfterHours(t *testing.T) {
 
 	e := Expires().AfterHours(2)
 	assert.NotNil(t, e)
-	assert.Condition(t, func() bool {
-		return !e.absolute.IsZero()
-	})
+	assert.False(t, e.absolute.IsZero())
 
 }
 
@@ -49,9 +53,7 @@ func TestAfterDays(t *testing.T) {
 
 	e := Expires().AfterDays(2)
 	assert.NotNil(t, e)
-	assert.Condition(t, func() bool {
-		return !e.absolute.IsZero()
-	})
+	assert.False(t, e.absolute.IsZero())
 
 }
 
@@ -60,6 +62,14 @@ func TestAfterSecondsIdle(t *testing.T) {
 	e := Expires().AfterSecondsIdle(2)
 	assert.NotNil(t, e)
 	assert.Equal(t, 2, e.idle.Seconds())
+
+}
+
+func TestAfterMinutesIdle(t *testing.T) {
+
+	e := Expires().AfterMinutesIdle(2)
+	assert.NotNil(t, e)
+	assert.Equal(t, 2, e.idle.Minutes())
 
 }
 
