@@ -1,2 +1,2 @@
-// hoard provides ultra-simple caching management package for Go objects.
+// hoard provides a fast, smart caching package for Go.
 package hoard
