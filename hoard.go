@@ -175,7 +175,7 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 		data, err, expiration = hoardFuncWithError[0]()
 
 		if err != nil {
-			return nil, err
+			return data, err
 		}
 
 		if expiration == nil {

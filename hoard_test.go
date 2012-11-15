@@ -79,7 +79,7 @@ func TestHoard_GetWithError(t *testing.T) {
 		return "second", errors.New("EXTERMINATE!!!"), ExpiresNever
 	})
 
-	assert.Nil(t, result)
+	assert.Equal(t, "second", result)
 	assert.NotNil(t, err)
 
 }
