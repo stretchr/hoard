@@ -9,7 +9,7 @@ import (
 type ExpirationFunc func() bool
 
 // ExpiresNever is an Expiration that indicates the objects never expire.
-var ExpiresNever *Expiration = nil
+var ExpiresNever *Expiration = &Expiration{}
 
 // Expiration describes when an object or objects will expire.
 type Expiration struct {

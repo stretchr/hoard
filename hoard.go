@@ -174,7 +174,7 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 		object.accessed = time.Now()
 		h.cacheSet(key, object)
 
-		if object.expiration != ExpiresNever {
+		if object.expiration != nil && object.expiration != ExpiresNever {
 			h.expirationCacheSet(key, object)
 		}
 	}
@@ -215,7 +215,7 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 		object.accessed = time.Now()
 		h.cacheSet(key, object)
 
-		if object.expiration != ExpiresNever {
+		if object.expiration != nil && object.expiration != ExpiresNever {
 			h.expirationCacheSet(key, object)
 		}
 	}
@@ -232,7 +232,7 @@ func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
 	var exp *Expiration
 
 	if len(expiration) == 0 {
-		exp = ExpiresNever
+		exp = h.defaultExpiration
 	} else {
 		exp = expiration[0]
 	}
@@ -281,13 +281,17 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 		return false
 	}
 
+	if expiration == nil {
+		expiration = h.defaultExpiration
+	}
+
 	// update the expiration policy
 	object.expiration = expiration
 
 	// set the object back in the cache
 	h.cacheSet(key, object)
 
-	if expiration == ExpiresNever {
+	if expiration == ExpiresNever || expiration == nil {
 		h.expireInternal(key)
 	} else {
 		h.expirationCacheSet(key, object)

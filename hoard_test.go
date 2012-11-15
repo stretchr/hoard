@@ -13,7 +13,7 @@ func TestHoard_MakeHoard(t *testing.T) {
 	h := MakeHoard(ExpiresNever)
 
 	if assert.NotNil(t, h) {
-		assert.Nil(t, h.defaultExpiration)
+		assert.Equal(t, h.defaultExpiration, ExpiresNever)
 	}
 
 	e := new(Expiration)
@@ -172,8 +172,37 @@ func TestHoard_Has(t *testing.T) {
 }
 
 // The below functions take forever to run as they wait for expirations to tick
-// They are commented out to speed up development
+// They are commented out to speed up development. They should be run before any
+// commit to ensure they still pass.
 /*
+func TestHoard_OverrideDefault(t *testing.T) {
+
+	h := MakeHoard(Expires().AfterSeconds(1))
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresNever
+	})
+
+	time.Sleep(2 * time.Second)
+
+	assert.False(t, h.getTickerRunning())
+	assert.Equal(t, 1, len(h.cache))
+
+	h = MakeHoard(ExpiresNever)
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", Expires().AfterSeconds(1)
+	})
+
+	assert.True(t, h.getTickerRunning())
+
+	time.Sleep(2 * time.Second)
+
+	assert.False(t, h.getTickerRunning())
+	assert.Equal(t, 0, len(h.cache))
+
+}
+
 func TestHoard_TickerStartStop(t *testing.T) {
 
 	h := SharedHoard()
@@ -219,7 +248,7 @@ func TestHoard_IdleExpiration(t *testing.T) {
 
 	result := h.Get("key3", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
-		expiration.ExpiresAfterSecondsIdle(2)
+		expiration.AfterSecondsIdle(2)
 		return "first", expiration
 	})
 	assert.Equal(t, result, "first")
@@ -248,7 +277,7 @@ func TestHoard_AbsoluteExpiration(t *testing.T) {
 
 	result := h.Get("key4", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
-		expiration.ExpiresAfterSeconds(1)
+		expiration.AfterSeconds(1)
 		return "first", expiration
 	})
 	assert.Equal(t, result, "first")
@@ -268,7 +297,7 @@ func TestHoard_ConditionalExpiration(t *testing.T) {
 
 	result := h.Get("key5", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
-		expiration.ExpiresOnCondition(func() bool {
+		expiration.OnCondition(func() bool {
 			return true
 		})
 		return "first", expiration
