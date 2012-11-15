@@ -28,6 +28,9 @@ type Hoard struct {
 	// cache is a map containing the container objects
 	cache map[string]container
 
+	// expirationCache is a map containing container objects
+	expirationCache map[string]container
+
 	// defaultExpiration is an expiration object applied to all objects that
 	// do not explicitly provide an expiration
 	defaultExpiration *Expiration
@@ -35,8 +38,17 @@ type Hoard struct {
 	// ticker controls how often the flush check is run
 	ticker *time.Ticker
 
-	// deadbolt is used to lock the cache object
-	deadbolt sync.RWMutex
+	// tickerRunning stores whether the ticker is started or not
+	tickerRunning bool
+
+	// cacheDeadbolt is used to lock the cache object
+	cacheDeadbolt sync.RWMutex
+
+	// expirationDeadbolt is used to lock the expirationCache object
+	expirationDeadbolt sync.RWMutex
+
+	// tickerDeadbolt is used to lock the ticker object
+	tickerDeadbolt sync.Mutex
 }
 
 // HoardFunc is a type for the function signature used to place data into the 
@@ -51,41 +63,51 @@ type HoardFuncWithError func() (interface{}, error, *Expiration)
 // flushes those that are expired
 func (h *Hoard) StartFlushManager() {
 
-	// Tick every second to check for expired data
-	h.ticker = time.NewTicker(1 * time.Second)
+	if !h.getTickerRunning() {
+		h.setTickerRunning(true)
 
-	go func() {
-		for currentTime := range h.ticker.C {
+		// Tick every second to check for expired data
+		h.ticker = time.NewTicker(1 * time.Second)
 
-			var expirations []string
+		go func() {
+			for currentTime := range h.ticker.C {
 
-			if len(h.cache) != 0 {
+				var expirations []string
 
-				h.deadbolt.RLock()
+				if len(h.expirationCache) != 0 {
 
-				for key, value := range h.cache {
+					h.expirationDeadbolt.RLock()
 
-					if value.expiration != nil {
-						if value.expiration.IsExpired(value.accessed, currentTime) {
-							expirations = append(expirations, key)
+					for key, value := range h.expirationCache {
+
+						if value.expiration != nil {
+							if value.expiration.IsExpired(value.accessed, currentTime) {
+								expirations = append(expirations, key)
+							}
 						}
 					}
-				}
 
-				h.deadbolt.RUnlock()
+					h.expirationDeadbolt.RUnlock()
 
-				if len(expirations) != 0 {
+					if len(expirations) != 0 {
 
-					h.deadbolt.Lock()
-					for _, key := range expirations {
-						delete(h.cache, key)
+						h.cacheDeadbolt.Lock()
+						h.expirationDeadbolt.Lock()
+						for _, key := range expirations {
+							delete(h.cache, key)
+							delete(h.expirationCache, key)
+						}
+						h.cacheDeadbolt.Unlock()
+						h.expirationDeadbolt.Unlock()
+
 					}
-					h.deadbolt.Unlock()
-
+				} else {
+					h.ticker.Stop()
+					h.setTickerRunning(false)
 				}
 			}
-		}
-	}()
+		}()
+	}
 }
 
 var sharedHoard *Hoard
@@ -109,8 +131,8 @@ func MakeHoard(defaultExpiration *Expiration) *Hoard {
 	h := new(Hoard)
 
 	h.cache = make(map[string]container)
+	h.expirationCache = make(map[string]container)
 	h.defaultExpiration = defaultExpiration
-	h.StartFlushManager()
 
 	return h
 
@@ -195,15 +217,25 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 }
 
 // Set stores an object in cache for the given key
+// Also, checks to see if the expiration is set, and starts the expiration
+// ticker if it is not already running, and adds the new item to the expiration
+// cache.
 func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
 	var exp *Expiration
+
 	if len(expiration) == 0 {
 		exp = ExpiresNever
 	} else {
 		exp = expiration[0]
 	}
+
 	containerObject := container{key, object, time.Now(), time.Now(), exp}
 	h.cacheSet(key, containerObject)
+
+	if exp != ExpiresNever {
+		h.expirationCacheSet(key, containerObject)
+		h.StartFlushManager()
+	}
 }
 
 // Has determines whether 
@@ -216,9 +248,9 @@ func (h *Hoard) Has(key string) bool {
 
 // Expire removes the item with the specified key from the map.
 func (h *Hoard) Expire(key string) {
-	h.deadbolt.Lock()
+	h.cacheDeadbolt.Lock()
 	delete(h.cache, key)
-	h.deadbolt.Unlock()
+	h.cacheDeadbolt.Unlock()
 }
 
 // SetExpires updates the expiration policy for the object of the
@@ -243,17 +275,50 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 // cacheGet retrieves an object from the cache atomically
 func (h *Hoard) cacheGet(key string) (container, bool) {
 
-	h.deadbolt.RLock()
+	h.cacheDeadbolt.RLock()
 	object, ok := h.cache[key]
-	h.deadbolt.RUnlock()
+	h.cacheDeadbolt.RUnlock()
 	return object, ok
 }
 
 // cacheSet sets an object in the cache atomically
 func (h *Hoard) cacheSet(key string, object container) {
 
-	h.deadbolt.Lock()
+	h.cacheDeadbolt.Lock()
 	h.cache[key] = object
-	h.deadbolt.Unlock()
+	h.cacheDeadbolt.Unlock()
 
+}
+
+// expirationCacheGet retrieves an object from the cache atomically
+func (h *Hoard) expirationCacheGet(key string) (container, bool) {
+
+	h.expirationDeadbolt.RLock()
+	object, ok := h.expirationCache[key]
+	h.expirationDeadbolt.RUnlock()
+	return object, ok
+}
+
+// expirationCacheSet sets an object in the cache atomically
+func (h *Hoard) expirationCacheSet(key string, object container) {
+
+	h.expirationDeadbolt.Lock()
+	h.expirationCache[key] = object
+	h.expirationDeadbolt.Unlock()
+
+}
+
+// getTickerRunning retrieves the ticker running status atomically
+func (h *Hoard) getTickerRunning() bool {
+	h.tickerDeadbolt.Lock()
+	tickerRunning := h.tickerRunning
+	h.tickerDeadbolt.Unlock()
+	return tickerRunning
+}
+
+// setTickerRunning retrieves the ticker running status atomically
+func (h *Hoard) setTickerRunning(tickerRunning bool) {
+	h.tickerDeadbolt.Lock()
+	h.tickerRunning = tickerRunning
+	h.tickerDeadbolt.Unlock()
 }

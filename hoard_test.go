@@ -1,8 +1,6 @@
 package hoard
 
 import (
-	//"github.com/stretchrcom/testify/assert"
-
 	"errors"
 	"github.com/stretchrcom/testify/assert"
 	"math/rand"
@@ -175,7 +173,47 @@ func TestHoard_Has(t *testing.T) {
 
 // The below functions take forever to run as they wait for expirations to tick
 // They are commented out to speed up development
-/*func TestHoard_IdleExpiration(t *testing.T) {
+/*
+func TestHoard_TickerStartStop(t *testing.T) {
+
+	h := SharedHoard()
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresNever
+	})
+
+	assert.False(t, h.getTickerRunning())
+	assert.Equal(t, 1, len(h.cache))
+
+	_ = h.Get("key2", func() (interface{}, *Expiration) {
+		return "first", Expires().AfterSeconds(1)
+	})
+
+	assert.True(t, h.getTickerRunning())
+	assert.Equal(t, 2, len(h.cache))
+
+	time.Sleep(3 * time.Second)
+
+	assert.False(t, h.getTickerRunning())
+
+	_ = h.Get("key3", func() (interface{}, *Expiration) {
+		return "first", Expires().AfterSeconds(1)
+	})
+	_ = h.Get("key4", func() (interface{}, *Expiration) {
+		return "first", Expires().AfterSeconds(2)
+	})
+
+	assert.True(t, h.getTickerRunning())
+	assert.Equal(t, 3, len(h.cache))
+
+	time.Sleep(4 * time.Second)
+
+	assert.False(t, h.getTickerRunning())
+	assert.Equal(t, 1, len(h.cache))
+
+}
+
+func TestHoard_IdleExpiration(t *testing.T) {
 
 	h := MakeHoard(ExpiresNever)
 
