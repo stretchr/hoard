@@ -149,12 +149,32 @@ func (h *Hoard) Expire(item container) {
 	h.deadbolt.Unlock()
 }
 
+// SetExpires updates the expiration policy for the object of the
+// specified key.
+func (h *Hoard) SetExpires(key string, expiration *Expiration) *Hoard {
+
+	item, ok := h.cacheGet(key)
+	if !ok {
+		panic("hoard: Cannot call SetExpires when no item exists for that key.")
+	}
+
+	// update the expiration policy
+	item.expiration = expiration
+
+	// set the item back in the cache
+	h.cacheSet(key, item)
+
+	// chain
+	return h
+
+}
+
 // cacheGet retrieves an item from the cache atomically
-func (h *Hoard) cacheGet(key string) (container, bool) {
+func (h *Hoard) cacheGet(key string) (item container, ok bool) {
 	h.deadbolt.RLock()
-	item, ok := h.cache[key]
+	item, ok = h.cache[key]
 	h.deadbolt.RUnlock()
-	return item, ok
+	return
 }
 
 // cacheSet sets an item in the cache atomically
