@@ -3,6 +3,7 @@
 A fast, smart caching package for Go.
 
 ##Get started
+Hoard offers a few different ways to manage caching in your Go programs.  
 ###Manual cache management
 Hoard provides simple `Has`, `Get` and `Set` methods to enable you to work with objects by a key:
 
@@ -23,7 +24,7 @@ Hoard provides simple `Has`, `Get` and `Set` methods to enable you to work with 
     }
 
 ###Hoard's special `Get` alternative
-But Hoard's `Get` method also provides a nicer alternative to remove a lot of common code.  Passing a `func` as the second argument tells Hoard how to get the object if it doesn't have it in its cache. 
+Hoard's `Get` method also provides a much simpler alternative that removes a lot of common code.  Passing a `func` (of type `HoardFunc`) as the second argument tells Hoard how to get the object if it doesn't have it in its cache. 
 
     func GetSomething() *Something {
 
@@ -38,6 +39,15 @@ But Hoard's `Get` method also provides a nicer alternative to remove a lot of co
       }).(*Something)
 
     }
+
+Remember, because the func is declared inline, variables defined around it will be available (via closures) making it easy to do other initialisation work in the `HoardFunc`.
+
+####HoardFunc type
+The `HoardFunc` type is defined as:
+
+    type HoardFunc func() (interface{}, *Expiration)
+
+The func takes no arguments, but will return an object (the object being defined), and an `Expiration` instance describing when the object should expire (see Expiring below).  For indefinite expiration (i.e. once it's created it should never expire) you can use the handy `hoard.ExpiresNever` object.
 
 ####With errors
 For the common case of methods that return an optional error as the second argument, Hoard provides the `GetWithError` alternative that works as you might expect:
