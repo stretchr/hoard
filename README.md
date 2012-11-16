@@ -5,6 +5,10 @@ A fast, smart caching package for Go.
 ##Overview
 Hoard provides easy-to-use, high performant cache management capabilities to your Go programs.
 
+###API Documentation
+
+  * Jump right into the [API documentation](http://go.pkgdoc.org/github.com/stretchrcom/hoard)
+
 ###When should I use Hoard?
 Caching is useful if:
 
@@ -54,9 +58,9 @@ Hoard provides simple `Has`, `Get` and `Set` methods to enable you to work with 
       // do we have this in the cache?
       if !hoard.Has("my-key") {
   
-      	// get the object and store it
-      	obj := SomeExpensiveMethodToGetTheObject()
-      	hoard.Set("my-key", obj)
+        // get the object and store it
+        obj := SomeExpensiveMethodToGetTheObject()
+        hoard.Set("my-key", obj)
   
       }
   
@@ -71,13 +75,13 @@ Hoard's `Get` method also provides a much simpler alternative that removes a lot
     func GetSomething() *Something {
 
       return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
-    	
-    	// get the object and return it
-    	obj := SomeExpensiveMethodToGetTheObject()
-    	
-    	// return the object (and tell it to never expire)
-    	return obj, hoard.ExpiresNever
-    	
+      
+      // get the object and return it
+      obj := SomeExpensiveMethodToGetTheObject()
+      
+      // return the object (and tell it to never expire)
+      return obj, hoard.ExpiresNever
+      
       }).(*Something)
 
     }
@@ -97,18 +101,18 @@ For the common case of methods that return an optional error as the second argum
     func GetSomething() (*Something, error) {
 
       obj, err := hoard.GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
-    	
-      	// get the object and return it
-      	obj, err := SomeExpensiveMethodToGetTheObject()
-      	
-      	// return the object (and tell it to never expire)
-      	return obj, err, hoard.ExpiresNever
-      	
+      
+        // get the object and return it
+        obj, err := SomeExpensiveMethodToGetTheObject()
+        
+        // return the object (and tell it to never expire)
+        return obj, err, hoard.ExpiresNever
+        
       })
       
       // did it return an error?
       if err != nil {
-      	return nil, err
+        return nil, err
       }
       
       // all is well
@@ -135,13 +139,13 @@ If you are using the special `Get` alternative, then you return the `Expiration`
     func GetSomething() *Something {
 
       return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
-    	
-    	  // get the object and return it
-    	  obj, err := SomeExpensiveMethodToGetTheObject()
-    	
-    	  // return the object (and tell it to never expire)
-    	  return obj, err, hoard.ExpiresNever
-    	
+      
+        // get the object and return it
+        obj, err := SomeExpensiveMethodToGetTheObject()
+      
+        // return the object (and tell it to never expire)
+        return obj, err, hoard.ExpiresNever
+      
       }).(*Something)
     
     }
