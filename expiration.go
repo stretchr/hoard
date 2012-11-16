@@ -37,8 +37,8 @@ func Expires() *Expiration {
 	return new(Expiration)
 }
 
-// IsExpired determines if an expiration object has expired
-func (e *Expiration) IsExpired(lastAccess, currentTime time.Time) bool {
+// IsExpiredByTime determines if an expiration object has expired by time
+func (e *Expiration) IsExpiredByTime(lastAccess, currentTime time.Time) bool {
 	if e.idle != 0 {
 		if currentTime.Sub(lastAccess) >
 			e.idle {
@@ -50,6 +50,16 @@ func (e *Expiration) IsExpired(lastAccess, currentTime time.Time) bool {
 			return true
 		}
 	}
+	if e.condition != nil {
+		if e.condition() {
+			return true
+		}
+	}
+	return false
+}
+
+// IsExpiredByCondition determines if an expiration object has expired by time
+func (e *Expiration) IsExpiredByCondition() bool {
 	if e.condition != nil {
 		if e.condition() {
 			return true
@@ -87,6 +97,12 @@ func (e *Expiration) AfterDays(days int64) *Expiration {
 	return e
 }
 
+// AfterDuration expires the item after "duration" Duration has passed
+func (e *Expiration) AfterDuration(duration time.Duration) *Expiration {
+	e.absolute = time.Now().Add(duration)
+	return e
+}
+
 // afterIdle does the work for each After*Idle function
 func (e *Expiration) afterIdle(duration int64, multiplier time.Duration) time.Duration {
 	return time.Duration(duration) * multiplier
@@ -120,6 +136,13 @@ func (e *Expiration) AfterDaysIdle(days int64) *Expiration {
 	return e
 }
 
+// AfterDurationIdle expires the item if it hasn't been accessed for
+// "days" days
+func (e *Expiration) AfterDurationIdle(duration time.Duration) *Expiration {
+	e.idle = duration
+	return e
+}
+
 // OnDate expires the item once "date" date has passed
 func (e *Expiration) OnDate(date time.Time) *Expiration {
 	e.absolute = date
@@ -128,9 +151,8 @@ func (e *Expiration) OnDate(date time.Time) *Expiration {
 
 // OnCondition expires the item if the "condition" func returns true
 //
-// This condition is checked, once per second, alongside the other expirations.
-// Do not put any expensive code inside this condition. This check must be
-// as quick as possible.
+// This condition is checked before retrieving the item from cache. If the 
+// condition expires the item, a new item will be fetched from the HoardFunc.
 func (e *Expiration) OnCondition(condition ExpirationFunc) *Expiration {
 	e.condition = condition
 	return e

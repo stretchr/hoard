@@ -135,6 +135,29 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 }
 
+func TestHoard_ConditionalExpiration(t *testing.T) {
+
+	h := MakeHoard(Expires().AfterSeconds(1))
+
+	result := h.Get("key", func() (interface{}, *Expiration) {
+		expiration := Expires().OnCondition(func() bool {
+			return true
+		})
+		return "first", expiration
+	})
+
+	assert.Equal(t, result, "first")
+
+	result = h.Get("key", func() (interface{}, *Expiration) {
+		expiration := Expires().OnCondition(func() bool {
+			return true
+		})
+		return "second", expiration
+	})
+
+	assert.Equal(t, result, "second")
+}
+
 func TestHoard_Set(t *testing.T) {
 
 	h := MakeHoard(ExpiresNever)

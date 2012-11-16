@@ -57,6 +57,14 @@ func TestAfterDays(t *testing.T) {
 
 }
 
+func TestAfterDuration(t *testing.T) {
+
+	e := Expires().AfterDuration(1)
+	assert.NotNil(t, e)
+	assert.False(t, e.absolute.IsZero())
+
+}
+
 func TestAfterSecondsIdle(t *testing.T) {
 
 	e := Expires().AfterSecondsIdle(2)
@@ -84,6 +92,14 @@ func TestAfterDaysIdle(t *testing.T) {
 func TestAfterHoursIdle(t *testing.T) {
 
 	e := Expires().AfterHoursIdle(2)
+	assert.NotNil(t, e)
+	assert.Equal(t, 2, e.idle.Hours())
+
+}
+
+func TestAfterDurationIdle(t *testing.T) {
+
+	e := Expires().AfterDurationIdle(2 * time.Hour)
 	assert.NotNil(t, e)
 	assert.Equal(t, 2, e.idle.Hours())
 

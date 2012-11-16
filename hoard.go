@@ -81,7 +81,7 @@ func (h *Hoard) StartFlushManager() {
 					for key, value := range h.expirationCache {
 
 						if value.expiration != nil {
-							if value.expiration.IsExpired(value.accessed, currentTime) {
+							if value.expiration.IsExpiredByTime(value.accessed, currentTime) {
 								expirations = append(expirations, key)
 							}
 						}
@@ -139,6 +139,16 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 	var data interface{}
 	object, ok := h.cacheGet(key)
 
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				ok = false
+			}
+		}
+	}
+
 	if !ok {
 		if len(hoardFunc) == 0 {
 			return nil
@@ -174,6 +184,14 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
+
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration.IsExpiredByCondition() {
+			Remove(object.key)
+			ok = false
+		}
+	}
 
 	if !ok {
 		if len(hoardFuncWithError) == 0 {
