@@ -52,16 +52,16 @@ Hoard provides simple `Has`, `Get` and `Set` methods to enable you to work with 
     func GetSomething() *Something {
 
       // do we have this in the cache?
-      if !hoard.SharedHoard().Has("my-key") {
+      if !hoard.Has("my-key") {
   
       	// get the object and store it
       	obj := SomeExpensiveMethodToGetTheObject()
-      	hoard.SharedHoard().Set("my-key", obj)
+      	hoard.Set("my-key", obj)
   
       }
   
       // return the object from the cache
-      return hoard.SharedHoard().Get("my-key").(*Something)
+      return hoard.Get("my-key").(*Something)
 
     }
 
@@ -70,7 +70,7 @@ Hoard's `Get` method also provides a much simpler alternative that removes a lot
 
     func GetSomething() *Something {
 
-      return hoard.SharedHoard().Get("my-key", func() (interface{}, *hoard.Expiration) {
+      return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
     	
     	// get the object and return it
     	obj := SomeExpensiveMethodToGetTheObject()
@@ -96,7 +96,7 @@ For the common case of methods that return an optional error as the second argum
 
     func GetSomething() (*Something, error) {
 
-      obj, err := hoard.SharedHoard().GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
+      obj, err := hoard.GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
     	
       	// get the object and return it
       	obj, err := SomeExpensiveMethodToGetTheObject()
@@ -126,7 +126,7 @@ If you are using the `Set` method directly, the third argument is a `hoard.Expir
 
 To tell hoard that the `object` expires after 20 seconds, you can do:
 
-    hoard.SharedHoard().Set(key, object, hoard.Expires().AfterSeconds(20))
+    hoard.Set(key, object, hoard.Expires().AfterSeconds(20))
 
 ###Expiring using `Get` alternative
 
@@ -134,7 +134,7 @@ If you are using the special `Get` alternative, then you return the `Expiration`
 
     func GetSomething() *Something {
 
-      return hoard.SharedHoard().Get("my-key", func() (interface{}, *hoard.Expiration) {
+      return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
     	
     	  // get the object and return it
     	  obj, err := SomeExpensiveMethodToGetTheObject()
@@ -145,6 +145,14 @@ If you are using the special `Get` alternative, then you return the `Expiration`
       }).(*Something)
     
     }
+
+###Complex expiration policies
+
+It is possible to combine certain expiration settings to form a complex policy, and this is done by chaining the method calls on an `Expiration` object.
+
+For example, if we want our tweets data to expire after twenty minutes of idle use, or after an hour regardless we could write this:
+
+    return obj, hoard.Expires().AfterMinutesIdle(20).AfterHours(1)
 
 ##Design patterns
 
@@ -159,7 +167,7 @@ For example, if we wanted to read a page of Tweets in our Go program, and wanted
     func (t *TweetService) GetTweets() (tweets *Tweets, err error) {
     
       // wrap it in a Hoard call for easy caching
-      tweets, err = hoard.SharedHoard().GetWithError("tweets", func() (interface{}, error, *hoard.Expiration) {
+      tweets, err = hoard.GetWithError("tweets", func() (interface{}, error, *hoard.Expiration) {
       
         // load the tweets
         loadedTweets, loadingErr := TweetLoadingAPICallThatTakesAWhile()
@@ -175,12 +183,16 @@ When our program calls `GetTweets()` the first time, Hoard will run the code tha
 
 ##`SharedHoard` and your own Hoards
 
-Hoard provides a common shared cache called `hoard.SharedHoard` that you can use from anywhere in your application, but you may decide to create your own storage (or multiple ones) which is as easy as calling `MakeHoard`:
+Hoard provides a common shared cache called `hoard.SharedHoard` that you can use from anywhere in your application.  All global funcs (`hoard.Get`, `hoard.Set`, `hoard.Has` etc.) will interact with the shared hoard instance.
+
+You may decide to create your own storage (or multiple ones) which is as easy as calling `MakeHoard`:
 
     h1 := MakeHoard(hoard.ExpiresNever)
     h2 := MakeHoard(hoard.ExpiresNever)
-    
-Notice you can pass a default expiration policy object into the `MakeHoard` func that will be applied to all objects.
+
+When you have an instance of the hoard, the same funcs are available as methods which will exclusively interact with the relevant `Hoard`.
+
+Also, notice you can pass a default expiration policy object into the `MakeHoard` func that will be applied to all objects by default.
 
 ##Installation
 To install hoard, just do:
