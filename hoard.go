@@ -5,68 +5,56 @@ import (
 	"time"
 )
 
-// container contains the cached data as well as metadata for the caching engine
+// container contains the cached data as well as metadata for the caching engine.
 type container struct {
-	// key is the string key at which this object is cached
+	// key is the string key at which this object is cached.
 	key string
 
-	// data is the actual cached data
+	// data is the actual cached data.
 	data interface{}
 
-	// created is the time this entry was first created
-	created time.Time
-
-	// accessed is the time this entry was last accessed
+	// accessed is the time this entry was last accessed.
 	accessed time.Time
 
-	// expiration holds the expiration properties for this object
+	// expiration holds the expiration properties for this object.
 	expiration *Expiration
 }
 
-// Hoard is a type that manages the actual caching
+// Hoard is the object through which all caching happens.
 type Hoard struct {
-	// cache is a map containing the container objects
+	// cache is a map containing the container objects.
 	cache map[string]container
 
-	// expirationCache is a map containing container objects
+	// expirationCache is a map containing container objects.
 	expirationCache map[string]container
 
 	// defaultExpiration is an expiration object applied to all objects that
-	// do not explicitly provide an expiration
+	// do not explicitly provide an expiration.
 	defaultExpiration *Expiration
 
-	// ticker controls how often the flush check is run
+	// ticker controls how often the flush check is run.
 	ticker *time.Ticker
 
-	// tickerRunning stores whether the ticker is started or not
+	// tickerRunning stores whether the ticker is running or not.
 	tickerRunning bool
 
-	// cacheDeadbolt is used to lock the cache object
+	// cacheDeadbolt is used to lock the cache object.
 	cacheDeadbolt sync.RWMutex
 
-	// expirationDeadbolt is used to lock the expirationCache object
+	// expirationDeadbolt is used to lock the expirationCache object.
 	expirationDeadbolt sync.RWMutex
 
-	// tickerDeadbolt is used to lock the ticker object
-	tickerDeadbolt sync.Mutex
+	// tickerRunningDeadbolt is used to lock the ticker object.
+	tickerRunningDeadbolt sync.Mutex
 }
 
-// HoardFunc is a type for the function signature used to place data into the 
-// caching system, as well as an optional expiration set
-type HoardFunc func() (interface{}, *Expiration)
-
-// HoardFuncWithError is a type for the function signature used to place data into the 
-// caching system, as well as an optional expiration set
-type HoardFuncWithError func() (interface{}, error, *Expiration)
-
-// StartFlushManager starts the ticker to check for expired entries and
-// flushes those that are expired
-func (h *Hoard) StartFlushManager() {
+// startFlushManager starts the ticker to check for expired objects and
+// flushes those that are expired.
+func (h *Hoard) startFlushManager() {
 
 	if !h.getTickerRunning() {
 		h.setTickerRunning(true)
 
-		// Tick every second to check for expired data
 		h.ticker = time.NewTicker(1 * time.Second)
 
 		go func() {
@@ -110,8 +98,24 @@ func (h *Hoard) StartFlushManager() {
 	}
 }
 
-// MakeHoard creates a new hoard object
-func MakeHoard(defaultExpiration *Expiration) *Hoard {
+// expireInternal removes the item with the specified key from the expiration cache.
+func (h *Hoard) expireInternal(key string) {
+	h.expirationDeadbolt.Lock()
+	delete(h.expirationCache, key)
+	h.expirationDeadbolt.Unlock()
+}
+
+// DataGetter is a type for the function signature used to place data into the
+// caching system from the "Get" method.
+type DataGetter func() (interface{}, *Expiration)
+
+// DataGetterWithError is a type for the function signature used to place data
+// into the caching system (and handling an error) from the "Get" method.
+type DataGetterWithError func() (interface{}, error, *Expiration)
+
+// Make creates a new *Hoard object. This function must be used to create
+// a hoard object as it readies various internal fields.
+func Make(defaultExpiration *Expiration) *Hoard {
 
 	h := new(Hoard)
 
@@ -124,17 +128,17 @@ func MakeHoard(defaultExpiration *Expiration) *Hoard {
 }
 
 /* Get is the most concise way to put data into the cache. However, it only
-* works when a single possible return value exists. Otherwise, use Set.
+* works for single return values.
 * This method performs several functions:
-* 1. If the key is in cache, it returns the object immediately
+* 1. If the key is in cache, it returns the object immediately and updates the last accessed time.
 * 2. If the key is not in the cache:
-*	a. It retrieves the object and expiration properties from the hoardFunc
-*	b. It creates a container object in which to store the data and metadata
-*	c. It stores the new container in the cache
+*	a. It retrieves the object and expiration properties from the dataGetter.
+*	b. It creates a container object in which to store the data and metadata.
+*	c. It stores the new container in the cache.
+*	d. It stores the container in the expirationCache if necessary.
 *
-* If no hoardfunc is passed and the key is not in the cache, returns nil.
-* Only the first hoardFunc is used. All others will be ignored */
-func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
+* If no dataGetter is passed and the key is not in the cache, returns nil. */
+func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
@@ -150,15 +154,16 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 	}
 
 	if !ok {
-		if len(hoardFunc) == 0 {
+		if len(dataGetter) == 0 {
+			// The object wasn't in cache and there is no dataGetter
 			return nil
 		}
 
 		var expiration *Expiration
 
-		data, expiration = hoardFunc[0]()
+		data, expiration = dataGetter[0]()
 
-		if expiration == nil {
+		if expiration == ExpiresDefault {
 			expiration = h.defaultExpiration
 		}
 
@@ -180,7 +185,7 @@ func (h *Hoard) Get(key string, hoardFunc ...HoardFunc) interface{} {
 
 // GetWithError does the same as Get, but handles error cases. If an error is
 // encountered, it does not cache anything and returns the error.
-func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithError) (interface{}, error) {
+func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithError) (interface{}, error) {
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
@@ -194,20 +199,20 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 	}
 
 	if !ok {
-		if len(hoardFuncWithError) == 0 {
+		if len(dataGetterWithError) == 0 {
 			return nil, nil
 		}
 
 		var expiration *Expiration
 		var err error
 
-		data, err, expiration = hoardFuncWithError[0]()
+		data, err, expiration = dataGetterWithError[0]()
 
 		if err != nil {
 			return data, err
 		}
 
-		if expiration == nil {
+		if expiration == ExpiresDefault {
 			expiration = h.defaultExpiration
 		}
 
@@ -227,10 +232,8 @@ func (h *Hoard) GetWithError(key string, hoardFuncWithError ...HoardFuncWithErro
 
 }
 
-// Set stores an object in cache for the given key
-// Also, checks to see if the expiration is set, and starts the expiration
-// ticker if it is not already running, and adds the new item to the expiration
-// cache.
+// Set stores an object in cache for the given key and starts the flush manager
+// if it isn't already running.
 func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
 	var exp *Expiration
 
@@ -240,16 +243,16 @@ func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
 		exp = expiration[0]
 	}
 
-	containerObject := container{key, object, time.Now(), time.Now(), exp}
+	containerObject := container{key, object, time.Now(), exp}
 	h.cacheSet(key, containerObject)
 
 	if exp != ExpiresNever {
 		h.expirationCacheSet(key, containerObject)
-		h.StartFlushManager()
+		h.startFlushManager()
 	}
 }
 
-// Has determines whether 
+// Has returns whether the key exists in the cache or not.
 func (h *Hoard) Has(key string) bool {
 
 	_, ok := h.cacheGet(key)
@@ -257,7 +260,7 @@ func (h *Hoard) Has(key string) bool {
 
 }
 
-// Remove removes the item with the specified key from the map.
+// Remove removes the item with the specified key from the cache.
 func (h *Hoard) Remove(key string) {
 	h.cacheDeadbolt.Lock()
 	delete(h.cache, key)
@@ -265,17 +268,10 @@ func (h *Hoard) Remove(key string) {
 	h.expireInternal(key)
 }
 
-// expireInternal removes the item with the specified key from the expiration cache.
-func (h *Hoard) expireInternal(key string) {
-	h.expirationDeadbolt.Lock()
-	delete(h.expirationCache, key)
-	h.expirationDeadbolt.Unlock()
-}
-
 // SetExpires updates the expiration policy for the object of the
 // specified key.
-// 
-// If the expiration is ExpiresNever, removes this item from the 
+//
+// If the expiration is ExpiresNever, removes this item from the
 // expirationCache
 func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 
@@ -285,7 +281,7 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 		return false
 	}
 
-	if expiration == nil {
+	if expiration == ExpiresDefault {
 		expiration = h.defaultExpiration
 	}
 
@@ -305,7 +301,7 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 
 }
 
-// cacheGet retrieves an object from the cache atomically
+// cacheGet retrieves an object from the cache atomically.
 func (h *Hoard) cacheGet(key string) (container, bool) {
 
 	h.cacheDeadbolt.RLock()
@@ -314,7 +310,7 @@ func (h *Hoard) cacheGet(key string) (container, bool) {
 	return object, ok
 }
 
-// cacheSet sets an object in the cache atomically
+// cacheSet sets an object in the cache atomically.
 func (h *Hoard) cacheSet(key string, object container) {
 
 	h.cacheDeadbolt.Lock()
@@ -323,7 +319,7 @@ func (h *Hoard) cacheSet(key string, object container) {
 
 }
 
-// expirationCacheGet retrieves an object from the cache atomically
+// expirationCacheGet retrieves an object from the expirationCache atomically.
 func (h *Hoard) expirationCacheGet(key string) (container, bool) {
 
 	h.expirationDeadbolt.RLock()
@@ -332,7 +328,7 @@ func (h *Hoard) expirationCacheGet(key string) (container, bool) {
 	return object, ok
 }
 
-// expirationCacheSet sets an object in the cache atomically
+// expirationCacheSet sets an object in the expirationCache atomically.
 func (h *Hoard) expirationCacheSet(key string, object container) {
 
 	h.expirationDeadbolt.Lock()
@@ -341,17 +337,17 @@ func (h *Hoard) expirationCacheSet(key string, object container) {
 
 }
 
-// getTickerRunning retrieves the ticker running status atomically
+// getTickerRunning retrieves the ticker running status atomically.
 func (h *Hoard) getTickerRunning() bool {
-	h.tickerDeadbolt.Lock()
+	h.tickerRunningDeadbolt.Lock()
 	tickerRunning := h.tickerRunning
-	h.tickerDeadbolt.Unlock()
+	h.tickerRunningDeadbolt.Unlock()
 	return tickerRunning
 }
 
-// setTickerRunning retrieves the ticker running status atomically
+// setTickerRunning retrieves the ticker running status atomically.
 func (h *Hoard) setTickerRunning(tickerRunning bool) {
-	h.tickerDeadbolt.Lock()
+	h.tickerRunningDeadbolt.Lock()
 	h.tickerRunning = tickerRunning
-	h.tickerDeadbolt.Unlock()
+	h.tickerRunningDeadbolt.Unlock()
 }

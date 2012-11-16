@@ -16,7 +16,7 @@ func TestExpires(t *testing.T) {
 func TestComplexExpires(t *testing.T) {
 
 	date := time.Now()
-	condition := ExpirationFunc(func() bool { return true })
+	condition := ExpirationCondition(func() bool { return true })
 	e := Expires().AfterHoursIdle(4).OnDate(date).OnCondition(condition)
 
 	assert.Equal(t, e.condition, condition)
@@ -116,7 +116,7 @@ func TestOnDate(t *testing.T) {
 
 func TestOnCondition(t *testing.T) {
 
-	condition := ExpirationFunc(func() bool { return true })
+	condition := ExpirationCondition(func() bool { return true })
 	e := Expires().OnCondition(condition)
 	assert.NotNil(t, e)
 	assert.Equal(t, condition, e.condition)

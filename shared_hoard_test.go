@@ -7,17 +7,17 @@ import (
 	"time"
 )
 
-func TestHoard_SharedHoard(t *testing.T) {
+func TestHoard_Shared(t *testing.T) {
 
-	h := SharedHoard()
+	h := Shared()
 	assert.NotNil(t, h)
 
-	h2 := SharedHoard()
+	h2 := Shared()
 	assert.Equal(t, h, h2)
 
 }
 
-func TestSharedHoard_Get(t *testing.T) {
+func TestShared_Get(t *testing.T) {
 
 	firstCalled := false
 	secondCalled := false
@@ -40,7 +40,7 @@ func TestSharedHoard_Get(t *testing.T) {
 
 }
 
-func TestSharedHoard_GetWithError(t *testing.T) {
+func TestShared_GetWithError(t *testing.T) {
 
 	result, err := GetWithError("key", func() (interface{}, error, *Expiration) {
 		return "first", nil, ExpiresNever
@@ -58,7 +58,7 @@ func TestSharedHoard_GetWithError(t *testing.T) {
 
 }
 
-func TestSharedHoard_Remove(t *testing.T) {
+func TestShared_Remove(t *testing.T) {
 
 	Get("something", func() (interface{}, *Expiration) {
 		return 1, nil
@@ -71,7 +71,7 @@ func TestSharedHoard_Remove(t *testing.T) {
 
 }
 
-func TestSharedHoard_SetExpires(t *testing.T) {
+func TestShared_SetExpires(t *testing.T) {
 
 	date := time.Now()
 
@@ -79,11 +79,11 @@ func TestSharedHoard_SetExpires(t *testing.T) {
 		return "first", ExpiresNever
 	})
 
-	assert.Equal(t, ExpiresNever, SharedHoard().cache["key"].expiration)
+	assert.Equal(t, ExpiresNever, Shared().cache["key"].expiration)
 
 	SetExpires("key", Expires().OnDate(date))
 
-	item, _ := SharedHoard().cacheGet("key")
+	item, _ := Shared().cacheGet("key")
 	if assert.NotNil(t, &item) {
 		if assert.NotNil(t, item.expiration, "Expiration should be set") {
 			assert.Equal(t, date, item.expiration.absolute)
@@ -92,14 +92,14 @@ func TestSharedHoard_SetExpires(t *testing.T) {
 
 }
 
-func TestSharedHoard_SetExpires_Panics(t *testing.T) {
+func TestShared_SetExpires_Panics(t *testing.T) {
 
-	sharedHoard = MakeHoard(nil)
+	sharedHoard = Make(nil)
 	assert.False(t, SetExpires("key", Expires().OnDate(time.Now())))
 
 }
 
-func TestSharedHoard_ExpirationSetting(t *testing.T) {
+func TestShared_ExpirationSetting(t *testing.T) {
 
 	result := Get("key2", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
@@ -112,26 +112,26 @@ func TestSharedHoard_ExpirationSetting(t *testing.T) {
 	})
 
 	assert.Equal(t, result, "second")
-	assert.NotEqual(t, 0, SharedHoard().cache["key2"].expiration.idle)
+	assert.NotEqual(t, 0, Shared().cache["key2"].expiration.idle)
 	assert.Condition(t, func() bool {
-		return !SharedHoard().cache["key2"].expiration.absolute.IsZero()
+		return !Shared().cache["key2"].expiration.absolute.IsZero()
 	})
 	assert.Condition(t, func() bool {
-		return SharedHoard().cache["key2"].expiration.condition != nil
+		return Shared().cache["key2"].expiration.condition != nil
 	})
 
 }
 
-func TestSharedHoard_Set(t *testing.T) {
+func TestShared_Set(t *testing.T) {
 
 	Set("key", 1)
 
-	assert.Equal(t, 1, SharedHoard().Get("key"))
+	assert.Equal(t, 1, Shared().Get("key"))
 	assert.Equal(t, 1, Get("key"))
 
 }
 
-func TestSharedHoard_Has(t *testing.T) {
+func TestShared_Has(t *testing.T) {
 
 	_ = Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever

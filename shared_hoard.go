@@ -4,15 +4,21 @@ import (
 	"sync"
 )
 
+// sharedHoard stores the singleton *Hoard instance
 var sharedHoard *Hoard
+
+// initOnce is used to guarantee that the sharedHoard is initialized only once.
 var initOnce sync.Once
 
-// SharedHoard returns a shared hoard object
-// The shared Hoard object does not have a default expiration policy
-func SharedHoard() *Hoard {
+// Shared returns the shared Hoard object
+//
+// The shared Hoard object has a default expiration policy of ExpiresNever.
+// If you wish your data to expire, you must provide your own policy to
+// override the ExpiresNever default.
+func Shared() *Hoard {
 
 	initOnce.Do(func() {
-		sharedHoard = MakeHoard(ExpiresNever)
+		sharedHoard = Make(ExpiresNever)
 	})
 
 	return sharedHoard
@@ -20,28 +26,28 @@ func SharedHoard() *Hoard {
 }
 
 /*
-	Global shortcut methods that just access the SharedHoard
+	Global shortcut methods for accessing the shared Hoard object
 */
 
 // Get gets a value from the shared hoard.
 //
 // This is a shortcut func, see the Hoard funcs for more details.
-func Get(key string, hoardFunc ...HoardFunc) interface{} {
-	return SharedHoard().Get(key, hoardFunc...)
+func Get(key string, dataGetter ...DataGetter) interface{} {
+	return Shared().Get(key, dataGetter...)
 }
 
-// GetWithError gets a value (or error) from the shared hoard.
+// GetWithError gets a value (with error) from the shared hoard.
 //
 // This is a shortcut func, see the Hoard funcs for more details.
-func GetWithError(key string, hoardFuncWithError ...HoardFuncWithError) (interface{}, error) {
-	return SharedHoard().GetWithError(key, hoardFuncWithError...)
+func GetWithError(key string, dataGetterWithError ...DataGetterWithError) (interface{}, error) {
+	return Shared().GetWithError(key, dataGetterWithError...)
 }
 
 // Remove removes an object by key form the shared hoard.
 //
 // This is a shortcut func, see the Hoard funcs for more details.
 func Remove(key string) {
-	SharedHoard().Remove(key)
+	Shared().Remove(key)
 }
 
 // SetExpires updates the expiration policy for the item with the specified key in
@@ -49,19 +55,19 @@ func Remove(key string) {
 //
 // This is a shortcut func, see the Hoard funcs for more details.
 func SetExpires(key string, expiration *Expiration) bool {
-	return SharedHoard().SetExpires(key, expiration)
+	return Shared().SetExpires(key, expiration)
 }
 
 // Set adds (or overwrites) an object in the shared hoard.
 //
 // This is a shortcut func, see the Hoard funcs for more details.
 func Set(key string, object interface{}, expiration ...*Expiration) {
-	SharedHoard().Set(key, object, expiration...)
+	Shared().Set(key, object, expiration...)
 }
 
 // Has gets whether the object exists in the shared hoard.
 //
 // This is a shortcut func, see the Hoard funcs for more details.
 func Has(key string) bool {
-	return SharedHoard().Has(key)
+	return Shared().Has(key)
 }

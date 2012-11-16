@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-func TestHoard_MakeHoard(t *testing.T) {
+func TestHoard_Make(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	if assert.NotNil(t, h) {
 		assert.Equal(t, h.defaultExpiration, ExpiresNever)
 	}
 
-	h = MakeHoard(Expires().AfterSeconds(1))
+	h = Make(Expires().AfterSeconds(1))
 	if assert.NotNil(t, h) {
 		assert.Condition(t, func() bool {
 			return !h.defaultExpiration.absolute.IsZero()
@@ -29,7 +29,7 @@ func TestHoard_Get(t *testing.T) {
 
 	firstCalled := false
 	secondCalled := false
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	result := h.Get("key", func() (interface{}, *Expiration) {
 		firstCalled = true
@@ -51,7 +51,7 @@ func TestHoard_Get(t *testing.T) {
 
 func TestHoard_GetWithError(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	result, err := h.GetWithError("key", func() (interface{}, error, *Expiration) {
 		return "first", nil, ExpiresNever
@@ -71,7 +71,7 @@ func TestHoard_GetWithError(t *testing.T) {
 
 func TestHoard_Remove(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	h.Get("something", func() (interface{}, *Expiration) {
 		return 1, nil
@@ -88,7 +88,7 @@ func TestHoard_SetExpires(t *testing.T) {
 
 	date := time.Now()
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 	h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever
 	})
@@ -108,14 +108,14 @@ func TestHoard_SetExpires(t *testing.T) {
 
 func TestHoard_SetExpires_Panics(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 	assert.False(t, h.SetExpires("key", Expires().OnDate(time.Now())))
 
 }
 
 func TestHoard_ExpirationSetting(t *testing.T) {
 
-	h := MakeHoard(Expires().AfterSeconds(1))
+	h := Make(Expires().AfterSeconds(1))
 
 	result := h.Get("key2", func() (interface{}, *Expiration) {
 		expiration := Expires().AfterSecondsIdle(10).AfterSeconds(10).OnCondition(func() bool {
@@ -137,7 +137,7 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 func TestHoard_ConditionalExpiration(t *testing.T) {
 
-	h := MakeHoard(Expires().AfterSeconds(1))
+	h := Make(Expires().AfterSeconds(1))
 
 	result := h.Get("key", func() (interface{}, *Expiration) {
 		expiration := Expires().OnCondition(func() bool {
@@ -160,7 +160,7 @@ func TestHoard_ConditionalExpiration(t *testing.T) {
 
 func TestHoard_Set(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	h.Set("key", 1)
 
@@ -169,7 +169,7 @@ func TestHoard_Set(t *testing.T) {
 }
 
 func TestHoard_Has(t *testing.T) {
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever
@@ -180,7 +180,7 @@ func TestHoard_Has(t *testing.T) {
 
 func TestHoard_OverrideDefault(t *testing.T) {
 
-	h := MakeHoard(Expires().AfterSeconds(1))
+	h := Make(Expires().AfterSeconds(1))
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever
@@ -188,7 +188,7 @@ func TestHoard_OverrideDefault(t *testing.T) {
 
 	assert.Equal(t, ExpiresNever, h.cache["key"].expiration)
 
-	h = MakeHoard(ExpiresNever)
+	h = Make(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", Expires().AfterSecondsIdle(1)
@@ -200,7 +200,7 @@ func TestHoard_OverrideDefault(t *testing.T) {
 
 func TestHoard_UseDefault(t *testing.T) {
 
-	h := MakeHoard(Expires().AfterSecondsIdle(1))
+	h := Make(Expires().AfterSecondsIdle(1))
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresDefault
@@ -208,7 +208,7 @@ func TestHoard_UseDefault(t *testing.T) {
 
 	assert.Equal(t, 1, h.cache["key"].expiration.idle.Seconds())
 
-	h = MakeHoard(ExpiresNever)
+	h = Make(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresDefault
@@ -224,7 +224,7 @@ func TestHoard_UseDefault(t *testing.T) {
 /*
 func TestHoard_TickerStartStop(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever
@@ -263,7 +263,7 @@ func TestHoard_TickerStartStop(t *testing.T) {
 
 func TestHoard_IdleExpiration(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	result := h.Get("key3", func() (interface{}, *Expiration) {
 		return "first", Expires().AfterSecondsIdle(2)
@@ -290,7 +290,7 @@ func TestHoard_IdleExpiration(t *testing.T) {
 
 func TestHoard_AbsoluteExpiration(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	result := h.Get("key4", func() (interface{}, *Expiration) {
 		return "first", Expires().AfterSeconds(1)
@@ -308,7 +308,7 @@ func TestHoard_AbsoluteExpiration(t *testing.T) {
 
 func TestHoard_ConditionalExpiration(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	result := h.Get("key5", func() (interface{}, *Expiration) {
 		return "first", Expires().OnCondition(func() bool {
@@ -332,7 +332,7 @@ func TestHoard_ConditionalExpiration(t *testing.T) {
 /*
 func TestHoard_ThreadSafety(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	iterations := 100000
 
@@ -387,7 +387,7 @@ func BenchmarkHoard_AddingExpiring(b *testing.B) {
 
 	b.StopTimer()
 
-	h := MakeHoard(ExpiresNever)
+	h := Make(ExpiresNever)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
