@@ -16,10 +16,7 @@ func TestHoard_MakeHoard(t *testing.T) {
 		assert.Equal(t, h.defaultExpiration, ExpiresNever)
 	}
 
-	e := new(Expiration)
-	e.AfterSeconds(1)
-
-	h = MakeHoard(e)
+	h = MakeHoard(Expires().AfterSeconds(1))
 	if assert.NotNil(t, h) {
 		assert.Condition(t, func() bool {
 			return !h.defaultExpiration.absolute.IsZero()
@@ -121,10 +118,7 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 	h := MakeHoard(Expires().AfterSeconds(1))
 
 	result := h.Get("key2", func() (interface{}, *Expiration) {
-		expiration := new(Expiration)
-		expiration.AfterSecondsIdle(10)
-		expiration.AfterSeconds(10)
-		expiration.OnCondition(func() bool {
+		expiration := Expires().AfterSecondsIdle(10).AfterSeconds(10).OnCondition(func() bool {
 			return true
 		})
 		return "second", expiration
@@ -207,7 +201,7 @@ func TestHoard_UseDefault(t *testing.T) {
 /*
 func TestHoard_TickerStartStop(t *testing.T) {
 
-	h := SharedHoard()
+	h := MakeHoard(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
 		return "first", ExpiresNever
@@ -249,9 +243,7 @@ func TestHoard_IdleExpiration(t *testing.T) {
 	h := MakeHoard(ExpiresNever)
 
 	result := h.Get("key3", func() (interface{}, *Expiration) {
-		expiration := new(Expiration)
-		expiration.AfterSecondsIdle(2)
-		return "first", expiration
+		return "first", Expires().AfterSecondsIdle(2)
 	})
 	assert.Equal(t, result, "first")
 	time.Sleep(1 * time.Second)
@@ -263,7 +255,7 @@ func TestHoard_IdleExpiration(t *testing.T) {
 
 	assert.Equal(t, result, "first")
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	result = h.Get("key3", func() (interface{}, *Expiration) {
 		return "second", ExpiresNever
@@ -278,9 +270,7 @@ func TestHoard_AbsoluteExpiration(t *testing.T) {
 	h := MakeHoard(ExpiresNever)
 
 	result := h.Get("key4", func() (interface{}, *Expiration) {
-		expiration := new(Expiration)
-		expiration.AfterSeconds(1)
-		return "first", expiration
+		return "first", Expires().AfterSeconds(1)
 	})
 	assert.Equal(t, result, "first")
 	time.Sleep(2 * time.Second)
@@ -298,11 +288,9 @@ func TestHoard_ConditionalExpiration(t *testing.T) {
 	h := MakeHoard(ExpiresNever)
 
 	result := h.Get("key5", func() (interface{}, *Expiration) {
-		expiration := new(Expiration)
-		expiration.OnCondition(func() bool {
+		return "first", Expires().OnCondition(func() bool {
 			return true
 		})
-		return "first", expiration
 	})
 
 	assert.Equal(t, result, "first")
@@ -314,11 +302,11 @@ func TestHoard_ConditionalExpiration(t *testing.T) {
 	})
 
 	assert.Equal(t, result, "second")
-}*/
+}
 
-/*
 // Tests thread safety between adding items and flushing items
 // This is an expensive, slow test, so it is commented out for now
+/*
 func TestHoard_ThreadSafety(t *testing.T) {
 
 	h := MakeHoard(ExpiresNever)
@@ -331,9 +319,7 @@ func TestHoard_ThreadSafety(t *testing.T) {
 	go func() {
 		for i := 0; i < iterations; i++ {
 			_ = h.Get(fmt.Sprintf("stresstest%d", i), func() (interface{}, *Expiration) {
-				expiration := new(Expiration)
-				expiration.ExpiresAfterSeconds(int64(rand.Int() % 10))
-				return "first", expiration
+				return "first", Expires().AfterSeconds(int64(rand.Int() % 10))
 			})
 		}
 		wait.Done()
@@ -342,9 +328,7 @@ func TestHoard_ThreadSafety(t *testing.T) {
 	go func() {
 		for i := 0; i < iterations; i++ {
 			_ = h.Get(fmt.Sprintf("stresstest-1-%d", i), func() (interface{}, *Expiration) {
-				expiration := new(Expiration)
-				expiration.ExpiresAfterSeconds(int64(rand.Int() % 10))
-				return "first", expiration
+				return "first", Expires().AfterSeconds(int64(rand.Int() % 10))
 			})
 		}
 		wait.Done()
@@ -353,9 +337,7 @@ func TestHoard_ThreadSafety(t *testing.T) {
 	go func() {
 		for i := 0; i < iterations; i++ {
 			_ = h.Get(fmt.Sprintf("stresstest-2-%d", i), func() (interface{}, *Expiration) {
-				expiration := new(Expiration)
-				expiration.ExpiresAfterSeconds(int64(rand.Int() % 10))
-				return "first", expiration
+				return "first", Expires().AfterSeconds(int64(rand.Int() % 10))
 			})
 		}
 		wait.Done()
@@ -364,9 +346,7 @@ func TestHoard_ThreadSafety(t *testing.T) {
 	go func() {
 		for i := 0; i < iterations; i++ {
 			_ = h.Get(fmt.Sprintf("stresstest-3-%d", i), func() (interface{}, *Expiration) {
-				expiration := new(Expiration)
-				expiration.ExpiresAfterSeconds(int64(rand.Int() % 10))
-				return "first", expiration
+				return "first", Expires().AfterSeconds(int64(rand.Int() % 10))
 			})
 		}
 		wait.Done()
@@ -378,21 +358,18 @@ func TestHoard_ThreadSafety(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}
 
-}
-*/
+}*/
 
 func BenchmarkHoard_AddingExpiring(b *testing.B) {
 
 	b.StopTimer()
 
-	h := SharedHoard()
+	h := MakeHoard(ExpiresNever)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		_ = h.Get(string(i), func() (interface{}, *Expiration) {
-			expiration := new(Expiration)
-			expiration.AfterSeconds(int64(rand.Int() % 2))
-			return 1, ExpiresNever
+			return 1, Expires().AfterSeconds(int64(rand.Int() % 2))
 		})
 	}
 
