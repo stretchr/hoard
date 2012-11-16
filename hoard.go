@@ -110,21 +110,6 @@ func (h *Hoard) StartFlushManager() {
 	}
 }
 
-var sharedHoard *Hoard
-var initOnce sync.Once
-
-// SharedHoard returns a shared hoard object
-// The shared Hoard object does not have a default expiration policy
-func SharedHoard() *Hoard {
-
-	initOnce.Do(func() {
-		sharedHoard = MakeHoard(ExpiresNever)
-	})
-
-	return sharedHoard
-
-}
-
 // MakeHoard creates a new hoard object
 func MakeHoard(defaultExpiration *Expiration) *Hoard {
 
@@ -278,6 +263,7 @@ func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
 
 	object, ok := h.cacheGet(key)
 	if !ok {
+		// not ok - we don't have this object
 		return false
 	}
 

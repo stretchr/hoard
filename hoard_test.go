@@ -28,16 +28,6 @@ func TestHoard_MakeHoard(t *testing.T) {
 
 }
 
-func TestHoard_SharedHoard(t *testing.T) {
-
-	h := SharedHoard()
-	assert.NotNil(t, h)
-
-	h2 := SharedHoard()
-	assert.Equal(t, h, h2)
-
-}
-
 func TestHoard_Get(t *testing.T) {
 
 	firstCalled := false
