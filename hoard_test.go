@@ -118,7 +118,7 @@ func TestHoard_SetExpires_Panics(t *testing.T) {
 
 func TestHoard_ExpirationSetting(t *testing.T) {
 
-	h := MakeHoard(ExpiresNever)
+	h := MakeHoard(Expires().AfterSeconds(1))
 
 	result := h.Get("key2", func() (interface{}, *Expiration) {
 		expiration := new(Expiration)
@@ -161,10 +161,6 @@ func TestHoard_Has(t *testing.T) {
 	assert.True(t, h.Has("key"))
 }
 
-// The below functions take forever to run as they wait for expirations to tick
-// They are commented out to speed up development. They should be run before any
-// commit to ensure they still pass.
-/*
 func TestHoard_OverrideDefault(t *testing.T) {
 
 	h := MakeHoard(Expires().AfterSeconds(1))
@@ -173,26 +169,42 @@ func TestHoard_OverrideDefault(t *testing.T) {
 		return "first", ExpiresNever
 	})
 
-	time.Sleep(2 * time.Second)
-
-	assert.False(t, h.getTickerRunning())
-	assert.Equal(t, 1, len(h.cache))
+	assert.Equal(t, ExpiresNever, h.cache["key"].expiration)
 
 	h = MakeHoard(ExpiresNever)
 
 	_ = h.Get("key", func() (interface{}, *Expiration) {
-		return "first", Expires().AfterSeconds(1)
+		return "first", Expires().AfterSecondsIdle(1)
 	})
 
-	assert.True(t, h.getTickerRunning())
-
-	time.Sleep(2 * time.Second)
-
-	assert.False(t, h.getTickerRunning())
-	assert.Equal(t, 0, len(h.cache))
+	assert.Equal(t, 1, h.cache["key"].expiration.idle.Seconds())
 
 }
 
+func TestHoard_UseDefault(t *testing.T) {
+
+	h := MakeHoard(Expires().AfterSecondsIdle(1))
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresDefault
+	})
+
+	assert.Equal(t, 1, h.cache["key"].expiration.idle.Seconds())
+
+	h = MakeHoard(ExpiresNever)
+
+	_ = h.Get("key", func() (interface{}, *Expiration) {
+		return "first", ExpiresDefault
+	})
+
+	assert.Equal(t, ExpiresNever, h.cache["key"].expiration)
+
+}
+
+// The below functions take forever to run as they wait for expirations to tick
+// They are commented out to speed up development. They should be run before any
+// commit to ensure they still pass.
+/*
 func TestHoard_TickerStartStop(t *testing.T) {
 
 	h := SharedHoard()

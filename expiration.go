@@ -11,6 +11,10 @@ type ExpirationFunc func() bool
 // ExpiresNever is an Expiration that indicates the objects never expire.
 var ExpiresNever *Expiration = &Expiration{}
 
+// ExpiresDefault is used to indicate that the cache system should
+// use the default expiration
+var ExpiresDefault *Expiration = nil
+
 // Expiration describes when an object or objects will expire.
 type Expiration struct {
 	// idle is the sliding window for expiration in nanoseconds
