@@ -92,7 +92,7 @@ The `DataGetter` type is defined as:
 
     type DataGetter func() (interface{}, *Expiration)
 
-The func takes no arguments, but must return an object (the object you intend to cache), and a `hoard.Expiration` instance describing when the object should expire (see [Expiring](#Expiring) below).  For indefinite expiration (i.e. once it's created it should never expire) you can use the handy `hoard.ExpiresNever` object.
+The func takes no arguments, but must return an object (the object you intend to cache), and a `hoard.Expiration` instance describing when the object should expire (see [Expiring](#expiring) below).  For indefinite expiration (i.e. once it's created it should never expire) you can use the handy `hoard.ExpiresNever` object.
 
 The `DataGetterWithError` type is defined as:
 
