@@ -13,7 +13,7 @@ Hoard provides easy-to-use, high performance cache management capabilities to yo
 Caching is useful if:
 
   * You have objects that are expensive/slow to create, such as reading from a database or the web.
-  * Your program could benefit from lazy loading of resources  
+  * Your program could benefit from lazy loading of resources.
   
 ###How does Hoard work?
 
@@ -26,6 +26,7 @@ Internally, Hoard manages the expiration of objects in a performant manner, and 
 When you ask Hoard to cache an object, you can specify how long it should be kept before it is deleted.
 
   * `hoard.ExpiresNever` - the object will _never_ expire
+  * `hoard.ExpiresDefault` - the object will inherit the default expiration policy
   
 You can tell Hoard to expire an object after a specific amount of time has passed by using the `After*` funcs:
   
