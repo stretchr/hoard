@@ -46,7 +46,7 @@ You can specify an actual `time.Time` date at which the object should expire:
 
   * `hoard.Expires().OnDate(t)` - the `time.Time` when the object will expire
   
-Or you can write your own expiry func using the `hoard.Expires().OnCondition(f)` func.
+Or you can write your own expiry function using the `hoard.Expires().OnCondition(f)` func.
   
 ##Get started
 Hoard offers a few different ways to manage caching in your Go programs.  
@@ -86,14 +86,14 @@ Hoard's `Get` method also provides a much simpler alternative that removes a lot
 
     }
 
-Remember, because the func is declared inline, variables defined around it will be available (via closures) making it easy to do other initialisation work in the `DataGetter`.
+Remember, because the function is declared inline, variables defined around it will be available (via closures) making it easy to do other initialisation work in the `DataGetter`.
 
 ####DataGetter and DataGetterWithError
 The `DataGetter` type is defined as:
 
     type DataGetter func() (interface{}, *Expiration)
 
-The func takes no arguments, but must return an object (the object you intend to cache), and a `hoard.Expiration` instance describing when the object should expire (see [Expiring](#expiring) below).  For indefinite expiration (i.e. once it's created it should never expire) you can use the handy `hoard.ExpiresNever` object.
+The functiong takes no arguments, but must return an object (the object you intend to cache), and a `hoard.Expiration` instance describing when the object should expire (see [Expiring](#expiring) below).  For indefinite expiration (i.e. once it's created it should never expire) you can use the handy `hoard.ExpiresNever` object.
 
 The `DataGetterWithError` type is defined as:
 
@@ -126,7 +126,7 @@ For the common case of methods that return an error as the second argument, Hoar
 
     }
 
-If the `SomeExpensiveFunctionToGetTheObject` function returns an error, nothing will be cached and next time the `GetSomething` func is called, it will try again.
+If the `SomeExpensiveFunctionToGetTheObject` function returns an error, nothing will be cached and next time the `GetSomething` function is called, it will try again.
 
 ##Expiring
 Hoard can automatically expire objects depending on the expiration policy you provide when placing the object in the cache.
