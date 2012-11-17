@@ -1,4 +1,4 @@
-# Hoard - All Your Bytes Are Belong To Us
+# Hoard - Cache in your Chips
 
 A fast, smart caching package for Go.
 
