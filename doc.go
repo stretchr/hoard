@@ -26,4 +26,6 @@
 // There are alternative ways to place data in the cache, such as a standard
 // "Set" method. Please see the documentation of the individual functions for
 // more details.
+//
+// Also, more examples and information can be found at https://github.com/stretchrcom/hoard
 package hoard
