@@ -108,7 +108,7 @@ For the common case of methods that return an error as the second argument, Hoar
       obj, err := hoard.GetWithError("my-key", func() (interface{}, error, *hoard.Expiration) {
       
         // get the object and return it
-        obj, err := SomeExpensiveMethodToGetTheObject()
+        obj, err := SomeExpensiveFunctionToGetTheObject()
         
         // return the object (and tell it to never expire)
         return obj, err, hoard.ExpiresNever
@@ -125,7 +125,7 @@ For the common case of methods that return an error as the second argument, Hoar
 
     }
 
-If the `SomeExpensiveMethodToGetTheObject` method returns an error, nothing will be cached and next time the `GetSomething` func is called, it will try again.
+If the `SomeExpensiveFunctionToGetTheObject` function returns an error, nothing will be cached and next time the `GetSomething` func is called, it will try again.
 
 ##Expiring
 Hoard can automatically expire objects depending on the expiration policy you provide when placing the object in the cache.
@@ -155,7 +155,7 @@ If you are using the special `Get` alternative, then you return the `Expiration`
       return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
       
         // get the object and return it
-        obj, err := SomeExpensiveMethodToGetTheObject()
+        obj, err := SomeExpensiveFunctionToGetTheObject()
       
         // return the object (and tell it to never expire)
         return obj, err, hoard.Expires().AfterSeconds(20)

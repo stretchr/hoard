@@ -21,6 +21,12 @@ type container struct {
 }
 
 // Hoard is the object through which all caching happens.
+//
+// Hoard manages caching data by key, as well as managing the expiration
+// of said data based on the expiration policy you provide.
+//
+// The flushing system will be started on demand, and will be terminated when
+// there is no more work to do.
 type Hoard struct {
 	// cache is a map containing the container objects.
 	cache map[string]container
@@ -105,202 +111,6 @@ func (h *Hoard) expireInternal(key string) {
 	h.expirationDeadbolt.Unlock()
 }
 
-// DataGetter is a type for the function signature used to place data into the
-// caching system from the "Get" method.
-type DataGetter func() (interface{}, *Expiration)
-
-// DataGetterWithError is a type for the function signature used to place data
-// into the caching system (and handling an error) from the "Get" method.
-type DataGetterWithError func() (interface{}, error, *Expiration)
-
-// Make creates a new *Hoard object. This function must be used to create
-// a hoard object as it readies various internal fields.
-func Make(defaultExpiration *Expiration) *Hoard {
-
-	h := new(Hoard)
-
-	h.cache = make(map[string]container)
-	h.expirationCache = make(map[string]container)
-	h.defaultExpiration = defaultExpiration
-
-	return h
-
-}
-
-/* Get is the most concise way to put data into the cache. However, it only
-* works for single return values.
-* This method performs several functions:
-* 1. If the key is in cache, it returns the object immediately and updates the last accessed time.
-* 2. If the key is not in the cache:
-*	a. It retrieves the object and expiration properties from the dataGetter.
-*	b. It creates a container object in which to store the data and metadata.
-*	c. It stores the new container in the cache.
-*	d. It stores the container in the expirationCache if necessary.
-*
-* If no dataGetter is passed and the key is not in the cache, returns nil. */
-func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
-
-	var data interface{}
-	object, ok := h.cacheGet(key)
-
-	if ok {
-		// The object exists, but may be expired
-		if object.expiration != nil {
-			if object.expiration.IsExpiredByCondition() {
-				Remove(object.key)
-				ok = false
-			}
-		}
-	}
-
-	if !ok {
-		if len(dataGetter) == 0 {
-			// The object wasn't in cache and there is no dataGetter
-			return nil
-		}
-
-		var expiration *Expiration
-
-		data, expiration = dataGetter[0]()
-
-		if expiration == ExpiresDefault {
-			expiration = h.defaultExpiration
-		}
-
-		h.Set(key, data, expiration)
-
-	} else {
-		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
-	}
-
-	return data
-
-}
-
-// GetWithError does the same as Get, but handles error cases. If an error is
-// encountered, it does not cache anything and returns the error.
-func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithError) (interface{}, error) {
-
-	var data interface{}
-	object, ok := h.cacheGet(key)
-
-	if ok {
-		// The object exists, but may be expired
-		if object.expiration.IsExpiredByCondition() {
-			Remove(object.key)
-			ok = false
-		}
-	}
-
-	if !ok {
-		if len(dataGetterWithError) == 0 {
-			return nil, nil
-		}
-
-		var expiration *Expiration
-		var err error
-
-		data, err, expiration = dataGetterWithError[0]()
-
-		if err != nil {
-			return data, err
-		}
-
-		if expiration == ExpiresDefault {
-			expiration = h.defaultExpiration
-		}
-
-		h.Set(key, data, expiration)
-
-	} else {
-		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
-	}
-
-	return data, nil
-
-}
-
-// Set stores an object in cache for the given key and starts the flush manager
-// if it isn't already running.
-func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
-	var exp *Expiration
-
-	if len(expiration) == 0 {
-		exp = h.defaultExpiration
-	} else {
-		exp = expiration[0]
-	}
-
-	containerObject := container{key, object, time.Now(), exp}
-	h.cacheSet(key, containerObject)
-
-	if exp != ExpiresNever {
-		h.expirationCacheSet(key, containerObject)
-		h.startFlushManager()
-	}
-}
-
-// Has returns whether the key exists in the cache or not.
-func (h *Hoard) Has(key string) bool {
-
-	_, ok := h.cacheGet(key)
-	return ok
-
-}
-
-// Remove removes the item with the specified key from the cache.
-func (h *Hoard) Remove(key string) {
-	h.cacheDeadbolt.Lock()
-	delete(h.cache, key)
-	h.cacheDeadbolt.Unlock()
-	h.expireInternal(key)
-}
-
-// SetExpires updates the expiration policy for the object of the
-// specified key.
-//
-// If the expiration is ExpiresNever, removes this item from the
-// expirationCache
-func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
-
-	object, ok := h.cacheGet(key)
-	if !ok {
-		// not ok - we don't have this object
-		return false
-	}
-
-	if expiration == ExpiresDefault {
-		expiration = h.defaultExpiration
-	}
-
-	// update the expiration policy
-	object.expiration = expiration
-
-	// set the object back in the cache
-	h.cacheSet(key, object)
-
-	if expiration == ExpiresNever || expiration == nil {
-		h.expireInternal(key)
-	} else {
-		h.expirationCacheSet(key, object)
-	}
-
-	return true
-
-}
-
 // cacheGet retrieves an object from the cache atomically.
 func (h *Hoard) cacheGet(key string) (container, bool) {
 
@@ -350,4 +160,204 @@ func (h *Hoard) setTickerRunning(tickerRunning bool) {
 	h.tickerRunningDeadbolt.Lock()
 	h.tickerRunning = tickerRunning
 	h.tickerRunningDeadbolt.Unlock()
+}
+
+// DataGetter is a type for the function signature used to place data into the
+// caching system from the "Get" method.
+type DataGetter func() (interface{}, *Expiration)
+
+// DataGetterWithError is a type for the function signature used to place data
+// into the caching system (and handling an error) from the "Get" method.
+type DataGetterWithError func() (interface{}, error, *Expiration)
+
+// Make creates a new *Hoard object. This function must be used to create
+// a hoard object as it readies various internal fields.
+//
+// If a Hoard object is created using new(), it will panic as soon as you
+// attempt to use it.
+func Make(defaultExpiration *Expiration) *Hoard {
+
+	h := new(Hoard)
+
+	h.cache = make(map[string]container)
+	h.expirationCache = make(map[string]container)
+	h.defaultExpiration = defaultExpiration
+
+	return h
+
+}
+
+// Get retrieves data from the cache using the key provided.
+//
+// If a dataGetter func is passed as the second argument, the Get method uses
+// it to ask the calling code to provide data to be cached. This is the most
+// concise and idomatic way of placing data in the cache.
+//
+// The dataGetter function only works for methods that return a single value.
+// If your code needs to return a value and an error, use the GetWithError
+// method.
+//
+// If no dataGetter is passed and the key is not in the cache, Get returns nil.
+func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
+
+	var data interface{}
+	object, ok := h.cacheGet(key)
+
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				ok = false
+			}
+		}
+	}
+
+	if !ok {
+		if len(dataGetter) == 0 {
+			// The object wasn't in cache and there is no dataGetter
+			return nil
+		}
+
+		var expiration *Expiration
+
+		data, expiration = dataGetter[0]()
+
+		if expiration == ExpiresDefault {
+			expiration = h.defaultExpiration
+		}
+
+		h.Set(key, data, expiration)
+
+	} else {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+	}
+
+	return data
+
+}
+
+// GetWithError operates the same way as Get, but handles error cases.
+//
+// If an error is encountered, the data and error are returned directly and
+// no caching is done.
+func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithError) (interface{}, error) {
+
+	var data interface{}
+	object, ok := h.cacheGet(key)
+
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration.IsExpiredByCondition() {
+			Remove(object.key)
+			ok = false
+		}
+	}
+
+	if !ok {
+		if len(dataGetterWithError) == 0 {
+			return nil, nil
+		}
+
+		var expiration *Expiration
+		var err error
+
+		data, err, expiration = dataGetterWithError[0]()
+
+		if err != nil {
+			return data, err
+		}
+
+		if expiration == ExpiresDefault {
+			expiration = h.defaultExpiration
+		}
+
+		h.Set(key, data, expiration)
+
+	} else {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+	}
+
+	return data, nil
+
+}
+
+// Set stores an object in cache for the given key.
+//
+// The third argument, expiration, is optional. If it is not provided, the
+// default expiration policy for this instance will be used.
+func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
+	var exp *Expiration
+
+	if len(expiration) == 0 {
+		exp = h.defaultExpiration
+	} else {
+		exp = expiration[0]
+	}
+
+	containerObject := container{key, object, time.Now(), exp}
+	h.cacheSet(key, containerObject)
+
+	if exp != ExpiresNever {
+		h.expirationCacheSet(key, containerObject)
+		h.startFlushManager()
+	}
+}
+
+// Has returns whether or not the key exists in the cache.
+func (h *Hoard) Has(key string) bool {
+
+	_, ok := h.cacheGet(key)
+	return ok
+
+}
+
+// Remove removes an object by key from the cache.
+func (h *Hoard) Remove(key string) {
+	h.cacheDeadbolt.Lock()
+	delete(h.cache, key)
+	h.cacheDeadbolt.Unlock()
+	h.expireInternal(key)
+}
+
+// SetExpires updates the expiration policy for the object of the
+// specified key.
+func (h *Hoard) SetExpires(key string, expiration *Expiration) bool {
+
+	object, ok := h.cacheGet(key)
+	if !ok {
+		// not ok - we don't have this object
+		return false
+	}
+
+	if expiration == ExpiresDefault {
+		expiration = h.defaultExpiration
+	}
+
+	// update the expiration policy
+	object.expiration = expiration
+
+	// set the object back in the cache
+	h.cacheSet(key, object)
+
+	if expiration == ExpiresNever || expiration == nil {
+		h.expireInternal(key)
+	} else {
+		h.expirationCacheSet(key, object)
+	}
+
+	return true
+
 }

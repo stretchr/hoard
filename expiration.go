@@ -105,7 +105,7 @@ func (e *Expiration) AfterDuration(duration time.Duration) *Expiration {
 	return e
 }
 
-// afterIdle does the work for each After*Idle function.
+// afterIdle does the work for each After*Idle method.
 func (e *Expiration) afterIdle(duration int64, multiplier time.Duration) time.Duration {
 	return time.Duration(duration) * multiplier
 }
