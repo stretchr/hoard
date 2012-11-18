@@ -19,7 +19,7 @@ Caching is useful if:
 
 The first time you need an object, Hoard will ask you to create it.  It will then store the object you provide in memory until it expires.  If your code needs it again, it will be returned from the cache.  If it has already expired, Hoard will ask you to create it again and store the result in the cache.
 
-Internally, Hoard manages the expiration of objects in a performant manner, and allows you to specify specific policies for when an object should expire
+Internally, Hoard manages the expiration of objects in a performant manner, and allows you to specify specific policies for when an object should expire.
 
 ###What kind of expiration does Hoard support?
 
@@ -76,11 +76,11 @@ Hoard's `Get` method also provides a much simpler alternative that removes a lot
 
       return hoard.Get("my-key", func() (interface{}, *hoard.Expiration) {
       
-      // get the object and return it
-      obj := SomeExpensiveMethodToGetTheObject()
+        // get the object and return it
+        obj := SomeExpensiveMethodToGetTheObject()
       
-      // return the object (and tell it to never expire)
-      return obj, hoard.ExpiresNever
+        // return the object (and tell it to never expire)
+        return obj, hoard.ExpiresNever
       
       }).(*Something)
 
