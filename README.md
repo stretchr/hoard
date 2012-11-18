@@ -17,7 +17,7 @@ Caching is useful if:
   
 ###How does Hoard work?
 
-The first time you need an object, Hoard will ask you to create it.  It will then store the object your provide in memory until it expires.  If your code needs it again, it will be returned from the cache.  If it has already expired, Hoard will ask you to create it again and store the result in the cache.
+The first time you need an object, Hoard will ask you to create it.  It will then store the object you provide in memory until it expires.  If your code needs it again, it will be returned from the cache.  If it has already expired, Hoard will ask you to create it again and store the result in the cache.
 
 Internally, Hoard manages the expiration of objects in a performant manner, and allows you to specify specific policies for when an object should expire
 
