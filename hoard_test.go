@@ -220,6 +220,7 @@ func TestHoard_UseDefault(t *testing.T) {
 
 var multiThread = Make(ExpiresDefault)
 var cachedInt = 0
+var cachedIntError = 0
 
 func TestHoard_GetSafety(t *testing.T) {
 
@@ -244,6 +245,14 @@ func GetInt(t *testing.T) {
 	}).(int)
 
 	assert.Equal(t, retrievedInt, 1)
+
+	retrievedIntError, _ := multiThread.GetWithError("MultiThreadGetIntError", func() (interface{}, error, *Expiration) {
+		cachedIntError++
+		time.Sleep(10 * time.Millisecond)
+		return cachedInt, nil, ExpiresNever
+	})
+
+	assert.Equal(t, retrievedIntError.(int), 1)
 
 }
 
