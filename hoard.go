@@ -47,6 +47,9 @@ type Hoard struct {
 	// cacheDeadbolt is used to lock the cache object.
 	cacheDeadbolt sync.RWMutex
 
+	// getterDeadbolt is used to lock the special Get methods
+	getterDeadbolt sync.Mutex
+
 	// expirationDeadbolt is used to lock the expirationCache object.
 	expirationDeadbolt sync.RWMutex
 
@@ -202,7 +205,42 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
+	expired := false
 
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				expired = true
+			}
+		}
+	}
+
+	// Short circuit for quick retrieval
+	if ok && !expired {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+
+		return data
+	}
+
+	// defer the unlock to account for early exits.
+	defer h.getterDeadbolt.Unlock()
+
+	// We need to lock this section to prevent multiple threads from calling
+	// the getter method more than once
+	h.getterDeadbolt.Lock()
+
+	// Now we need to make sure that the data we are seeking wasn't retrieved
+	// by another thread, and that it hasn't been expired in that time
+
+	object, ok = h.cacheGet(key)
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
@@ -214,6 +252,7 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	}
 
 	if !ok {
+
 		if len(dataGetter) == 0 {
 			// The object wasn't in cache and there is no dataGetter
 			return nil
@@ -231,12 +270,6 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 
 	} else {
 		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
 	}
 
 	return data
@@ -251,12 +284,49 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
+	expired := false
 
 	if ok {
 		// The object exists, but may be expired
-		if object.expiration.IsExpiredByCondition() {
-			Remove(object.key)
-			ok = false
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				expired = true
+			}
+		}
+	}
+
+	// Short circuit for quick retrieval
+	if ok && !expired {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+
+		return data, nil
+	}
+
+	// defer the unlock to account for early exits.
+	defer h.getterDeadbolt.Unlock()
+
+	// We need to lock this section to prevent multiple threads from calling
+	// the getter method more than once
+	h.getterDeadbolt.Lock()
+
+	// Now we need to make sure that the data we are seeking wasn't retrieved
+	// by another thread, and that it hasn't been expired in that time
+
+	object, ok = h.cacheGet(key)
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				ok = false
+			}
 		}
 	}
 
@@ -282,12 +352,6 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 
 	} else {
 		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
 	}
 
 	return data, nil
