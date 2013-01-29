@@ -260,11 +260,13 @@ func TestHoard_ReEntry(t *testing.T) {
 
 	h := Make(ExpiresDefault)
 
-	h.Get("reone", func() (interface{}, *Expiration) {
+	result := h.Get("reone", func() (interface{}, *Expiration) {
 		return h.Get("retwo", func() (interface{}, *Expiration) {
 			return "retwo", ExpiresNever
 		}), ExpiresNever
-	})
+	}).(string)
+
+	assert.Equal(t, result, "retwo")
 
 }
 
