@@ -256,6 +256,18 @@ func GetInt(t *testing.T) {
 
 }
 
+func TestHoard_ReEntry(t *testing.T) {
+
+	h := Make(ExpiresDefault)
+
+	h.Get("reone", func() (interface{}, *Expiration) {
+		return h.Get("retwo", func() (interface{}, *Expiration) {
+			return "retwo", ExpiresNever
+		}), ExpiresNever
+	})
+
+}
+
 // The below functions take forever to run as they wait for expirations to tick
 // They are commented out to speed up development. They should be run before any
 // commit to ensure they still pass.

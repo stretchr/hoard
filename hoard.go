@@ -47,14 +47,18 @@ type Hoard struct {
 	// cacheDeadbolt is used to lock the cache object.
 	cacheDeadbolt sync.RWMutex
 
-	// getterDeadbolt is used to lock the special Get methods
-	getterDeadbolt sync.Mutex
-
 	// expirationDeadbolt is used to lock the expirationCache object.
 	expirationDeadbolt sync.RWMutex
 
 	// tickerRunningDeadbolt is used to lock the ticker object.
 	tickerRunningDeadbolt sync.Mutex
+
+	// keyDeadbolts hold a mutex for each key to provide thread safety for
+	// multiple thread access and reentrant calls
+	keyDeadbolts map[string]*sync.Mutex
+
+	// keyDeadbolt provides thread safety for the keyDeadbolts map
+	keyDeadbolt sync.Mutex
 }
 
 // startFlushManager starts the ticker to check for expired objects and
@@ -132,6 +136,35 @@ func (h *Hoard) cacheSet(key string, object container) {
 
 }
 
+// keyDeadboltsCreate creates a new deadbolt in the map
+func (h *Hoard) keyDeadboltsCreate(key string) {
+
+	h.keyDeadbolt.Lock()
+	var newMutex sync.Mutex
+	h.keyDeadbolts[key] = &newMutex
+	h.keyDeadbolt.Unlock()
+
+}
+
+// keyDeadboltsGet creates a new deadbolt in the map
+func (h *Hoard) keyDeadboltsGet(key string) (*sync.Mutex, bool) {
+
+	h.keyDeadbolt.Lock()
+	object, ok := h.keyDeadbolts[key]
+	h.keyDeadbolt.Unlock()
+
+	return object, ok
+}
+
+// keyDeadboltsDelete deletes an unneeded deadbolt
+func (h *Hoard) keyDeadboltsDelete(key string) {
+
+	h.keyDeadbolt.Lock()
+	delete(h.keyDeadbolts, key)
+	h.keyDeadbolt.Unlock()
+
+}
+
 // expirationCacheGet retrieves an object from the expirationCache atomically.
 func (h *Hoard) expirationCacheGet(key string) (container, bool) {
 
@@ -185,6 +218,7 @@ func Make(defaultExpiration *Expiration) *Hoard {
 	h.cache = make(map[string]container)
 	h.expirationCache = make(map[string]container)
 	h.defaultExpiration = defaultExpiration
+	h.keyDeadbolts = make(map[string]*sync.Mutex)
 
 	return h
 
@@ -230,12 +264,25 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 		return data
 	}
 
+	// We need to make a deadbolt for this key if one doesn't exist
+	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
+		h.keyDeadbolt.Lock()
+		if _, exists := h.keyDeadbolts[key]; !exists {
+			var mutex sync.Mutex
+			h.keyDeadbolts[key] = &mutex
+		}
+		h.keyDeadbolt.Unlock()
+
+	}
+
+	keyDeadbolt := h.keyDeadbolts[key]
+
 	// defer the unlock to account for early exits.
-	defer h.getterDeadbolt.Unlock()
+	defer keyDeadbolt.Unlock()
 
 	// We need to lock this section to prevent multiple threads from calling
 	// the getter method more than once
-	h.getterDeadbolt.Lock()
+	keyDeadbolt.Lock()
 
 	// Now we need to make sure that the data we are seeking wasn't retrieved
 	// by another thread, and that it hasn't been expired in that time
@@ -309,12 +356,25 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 		return data, nil
 	}
 
+	// We need to make a deadbolt for this key if one doesn't exist
+	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
+		h.keyDeadbolt.Lock()
+		if _, exists := h.keyDeadbolts[key]; !exists {
+			var mutex sync.Mutex
+			h.keyDeadbolts[key] = &mutex
+		}
+		h.keyDeadbolt.Unlock()
+
+	}
+
+	keyDeadbolt := h.keyDeadbolts[key]
+
 	// defer the unlock to account for early exits.
-	defer h.getterDeadbolt.Unlock()
+	defer keyDeadbolt.Unlock()
 
 	// We need to lock this section to prevent multiple threads from calling
 	// the getter method more than once
-	h.getterDeadbolt.Lock()
+	keyDeadbolt.Lock()
 
 	// Now we need to make sure that the data we are seeking wasn't retrieved
 	// by another thread, and that it hasn't been expired in that time
