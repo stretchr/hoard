@@ -52,6 +52,13 @@ type Hoard struct {
 
 	// tickerRunningDeadbolt is used to lock the ticker object.
 	tickerRunningDeadbolt sync.Mutex
+
+	// keyDeadbolts hold a mutex for each key to provide thread safety for
+	// multiple thread access and reentrant calls
+	keyDeadbolts map[string]*sync.Mutex
+
+	// keyDeadbolt provides thread safety for the keyDeadbolts map
+	keyDeadbolt sync.Mutex
 }
 
 // startFlushManager starts the ticker to check for expired objects and
@@ -129,6 +136,35 @@ func (h *Hoard) cacheSet(key string, object container) {
 
 }
 
+// keyDeadboltsCreate creates a new deadbolt in the map
+func (h *Hoard) keyDeadboltsCreate(key string) {
+
+	h.keyDeadbolt.Lock()
+	var newMutex sync.Mutex
+	h.keyDeadbolts[key] = &newMutex
+	h.keyDeadbolt.Unlock()
+
+}
+
+// keyDeadboltsGet creates a new deadbolt in the map
+func (h *Hoard) keyDeadboltsGet(key string) (*sync.Mutex, bool) {
+
+	h.keyDeadbolt.Lock()
+	object, ok := h.keyDeadbolts[key]
+	h.keyDeadbolt.Unlock()
+
+	return object, ok
+}
+
+// keyDeadboltsDelete deletes an unneeded deadbolt
+func (h *Hoard) keyDeadboltsDelete(key string) {
+
+	h.keyDeadbolt.Lock()
+	delete(h.keyDeadbolts, key)
+	h.keyDeadbolt.Unlock()
+
+}
+
 // expirationCacheGet retrieves an object from the expirationCache atomically.
 func (h *Hoard) expirationCacheGet(key string) (container, bool) {
 
@@ -182,6 +218,7 @@ func Make(defaultExpiration *Expiration) *Hoard {
 	h.cache = make(map[string]container)
 	h.expirationCache = make(map[string]container)
 	h.defaultExpiration = defaultExpiration
+	h.keyDeadbolts = make(map[string]*sync.Mutex)
 
 	return h
 
@@ -202,7 +239,55 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
+	expired := false
 
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				expired = true
+			}
+		}
+	}
+
+	// Short circuit for quick retrieval
+	if ok && !expired {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+
+		return data
+	}
+
+	// We need to make a deadbolt for this key if one doesn't exist
+	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
+		h.keyDeadbolt.Lock()
+		if _, exists := h.keyDeadbolts[key]; !exists {
+			var mutex sync.Mutex
+			h.keyDeadbolts[key] = &mutex
+		}
+		h.keyDeadbolt.Unlock()
+
+	}
+
+	keyDeadbolt := h.keyDeadbolts[key]
+
+	// defer the unlock to account for early exits.
+	defer keyDeadbolt.Unlock()
+
+	// We need to lock this section to prevent multiple threads from calling
+	// the getter method more than once
+	keyDeadbolt.Lock()
+
+	// Now we need to make sure that the data we are seeking wasn't retrieved
+	// by another thread, and that it hasn't been expired in that time
+
+	object, ok = h.cacheGet(key)
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
@@ -214,6 +299,7 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	}
 
 	if !ok {
+
 		if len(dataGetter) == 0 {
 			// The object wasn't in cache and there is no dataGetter
 			return nil
@@ -231,12 +317,6 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 
 	} else {
 		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
 	}
 
 	return data
@@ -251,12 +331,62 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 
 	var data interface{}
 	object, ok := h.cacheGet(key)
+	expired := false
 
 	if ok {
 		// The object exists, but may be expired
-		if object.expiration.IsExpiredByCondition() {
-			Remove(object.key)
-			ok = false
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				expired = true
+			}
+		}
+	}
+
+	// Short circuit for quick retrieval
+	if ok && !expired {
+		data = object.data
+		object.accessed = time.Now()
+		h.cacheSet(key, object)
+
+		if object.expiration != nil && object.expiration != ExpiresNever {
+			h.expirationCacheSet(key, object)
+		}
+
+		return data, nil
+	}
+
+	// We need to make a deadbolt for this key if one doesn't exist
+	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
+		h.keyDeadbolt.Lock()
+		if _, exists := h.keyDeadbolts[key]; !exists {
+			var mutex sync.Mutex
+			h.keyDeadbolts[key] = &mutex
+		}
+		h.keyDeadbolt.Unlock()
+
+	}
+
+	keyDeadbolt := h.keyDeadbolts[key]
+
+	// defer the unlock to account for early exits.
+	defer keyDeadbolt.Unlock()
+
+	// We need to lock this section to prevent multiple threads from calling
+	// the getter method more than once
+	keyDeadbolt.Lock()
+
+	// Now we need to make sure that the data we are seeking wasn't retrieved
+	// by another thread, and that it hasn't been expired in that time
+
+	object, ok = h.cacheGet(key)
+	if ok {
+		// The object exists, but may be expired
+		if object.expiration != nil {
+			if object.expiration.IsExpiredByCondition() {
+				Remove(object.key)
+				ok = false
+			}
 		}
 	}
 
@@ -282,12 +412,6 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 
 	} else {
 		data = object.data
-		object.accessed = time.Now()
-		h.cacheSet(key, object)
-
-		if object.expiration != nil && object.expiration != ExpiresNever {
-			h.expirationCacheSet(key, object)
-		}
 	}
 
 	return data, nil

@@ -218,6 +218,58 @@ func TestHoard_UseDefault(t *testing.T) {
 
 }
 
+var multiThread = Make(ExpiresDefault)
+var cachedInt = 0
+var cachedIntError = 0
+
+func TestHoard_GetSafety(t *testing.T) {
+
+	// We should be able to call the special get function from multiple threads
+	// and have it only execute once
+
+	go GetInt(t)
+	go GetInt(t)
+	go GetInt(t)
+	go GetInt(t)
+	GetInt(t)
+	time.Sleep(time.Millisecond * 10)
+
+}
+
+func GetInt(t *testing.T) {
+
+	retrievedInt := multiThread.Get("MultiThreadGetInt", func() (interface{}, *Expiration) {
+		cachedInt++
+		time.Sleep(10 * time.Millisecond)
+		return cachedInt, ExpiresNever
+	}).(int)
+
+	assert.Equal(t, retrievedInt, 1)
+
+	retrievedIntError, _ := multiThread.GetWithError("MultiThreadGetIntError", func() (interface{}, error, *Expiration) {
+		cachedIntError++
+		time.Sleep(10 * time.Millisecond)
+		return cachedInt, nil, ExpiresNever
+	})
+
+	assert.Equal(t, retrievedIntError.(int), 1)
+
+}
+
+func TestHoard_ReEntry(t *testing.T) {
+
+	h := Make(ExpiresDefault)
+
+	result := h.Get("reone", func() (interface{}, *Expiration) {
+		return h.Get("retwo", func() (interface{}, *Expiration) {
+			return "retwo", ExpiresNever
+		}), ExpiresNever
+	}).(string)
+
+	assert.Equal(t, result, "retwo")
+
+}
+
 // The below functions take forever to run as they wait for expirations to tick
 // They are commented out to speed up development. They should be run before any
 // commit to ensure they still pass.
