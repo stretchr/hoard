@@ -230,6 +230,11 @@ func Make(defaultExpiration *Expiration) *Hoard {
 // it to ask the calling code to provide data to be cached. This is the most
 // concise and idomatic way of placing data in the cache.
 //
+// A DataGetter calling Get with the same key as the key for which the
+// DataGetter is called, the system will deadlock. It is best to avoid calling
+// Get from within a DataGetter unless you make sure the same key is not used
+// twice.
+//
 // The dataGetter function only works for methods that return a single value.
 // If your code needs to return a value and an error, use the GetWithError
 // method.
@@ -324,6 +329,9 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 }
 
 // GetWithError operates the same way as Get, but handles error cases.
+//
+// Please refer to the documentation for the Get method for more information on
+// usage and unsupported behavior.
 //
 // If an error is encountered, the data and error are returned directly and
 // no caching is done.
