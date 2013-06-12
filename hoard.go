@@ -270,15 +270,14 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	}
 
 	// We need to make a deadbolt for this key if one doesn't exist
+	h.keyDeadbolt.Lock()
 	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
-		h.keyDeadbolt.Lock()
 		if _, exists := h.keyDeadbolts[key]; !exists {
 			var mutex sync.Mutex
 			h.keyDeadbolts[key] = &mutex
 		}
-		h.keyDeadbolt.Unlock()
-
 	}
+	h.keyDeadbolt.Unlock()
 
 	keyDeadbolt := h.keyDeadbolts[key]
 
@@ -365,15 +364,14 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 	}
 
 	// We need to make a deadbolt for this key if one doesn't exist
+	h.keyDeadbolt.Lock()
 	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
-		h.keyDeadbolt.Lock()
 		if _, exists := h.keyDeadbolts[key]; !exists {
 			var mutex sync.Mutex
 			h.keyDeadbolts[key] = &mutex
 		}
-		h.keyDeadbolt.Unlock()
-
 	}
+	h.keyDeadbolt.Unlock()
 
 	keyDeadbolt := h.keyDeadbolts[key]
 
