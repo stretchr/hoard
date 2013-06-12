@@ -7,7 +7,7 @@ Hoard provides easy-to-use, high performance cache management capabilities to yo
 
 ###API Documentation
 
-  * Jump right into the [API documentation](http://go.pkgdoc.org/github.com/stretchrcom/hoard)
+  * Jump right into the [API documentation](http://go.pkgdoc.org/github.com/stretchr/hoard)
 
 ###When should I use Hoard?
 Caching is useful if:
@@ -214,11 +214,11 @@ When you create a `Hoard` instance, all the same functions are available and the
 ##Installation
 To install hoard, just do:
 
-    go get github.com/stretchrcom/hoard
+    go get github.com/stretchr/hoard
 
 Updating is as simple as:
 
-    go get -u github.com/stretchrcom/hoard
+    go get -u github.com/stretchr/hoard
     
     
 ##Contributing

@@ -2,7 +2,7 @@ package hoard
 
 import (
 	"errors"
-	"github.com/stretchrcom/testify/assert"
+	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
 	"time"
