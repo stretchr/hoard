@@ -26,7 +26,7 @@ type Expiration struct {
 	// date is an specific point in time to expire at
 	date time.Time
 
-	// absolute is the absolute point in time, used for fast comparation.
+	// absolute is the absolute point in time, used for fast comparasion.
 	// its the earliest resulting time from idle, duration or date.
 	absolute time.Time
 
@@ -63,7 +63,7 @@ func (e *Expiration) updateAbsoluteTime(lastAccess, created time.Time) *Expirati
 }
 
 // isExpiredAbsolute is a quicker variant of IsExpired, but only works if the internal absolute time has been set,
-// i.e. the Expiration must have been created by calling getAbsoluteExpiration()
+// i.e. updateAbsoluteTime() must have been called on it before
 func (e *Expiration) isExpiredAbsolute(currentTime time.Time) bool {
 
 	if !e.absolute.IsZero() && currentTime.After(e.absolute) {
