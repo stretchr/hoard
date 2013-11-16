@@ -44,8 +44,8 @@ func Expires() *Expiration {
 	return new(Expiration)
 }
 
-// updateAbsoluteTime sets the  internal absolute field to the earliest point
-// in time resulting from idle, duration or date at the time of the call.
+// updateAbsoluteTime sets the internal absolute field to the earliest point
+// in time resulting from idle, duration or date.
 func (e *Expiration) updateAbsoluteTime(lastAccess, created time.Time) *Expiration {
 	abs := e.date
 	if e.idle != 0 {
@@ -63,7 +63,7 @@ func (e *Expiration) updateAbsoluteTime(lastAccess, created time.Time) *Expirati
 }
 
 // isExpiredAbsolute is a quicker variant of IsExpired, but only works if the internal absolute time has been set,
-// i.e. the Expiration must have been created by calling getAAsoluteExpiration()
+// i.e. the Expiration must have been created by calling getAbsoluteExpiration()
 func (e *Expiration) isExpiredAbsolute(currentTime time.Time) bool {
 
 	if !e.absolute.IsZero() && currentTime.After(e.absolute) {
