@@ -16,10 +16,10 @@ func TestHoard_Make(t *testing.T) {
 		assert.Equal(t, h.defaultExpiration, ExpiresNever)
 	}
 
-	h = Make(Expires().AfterSeconds(1))
+	h = Make(Expires().AfterSeconds(3))
 	if assert.NotNil(t, h) {
 		assert.Condition(t, func() bool {
-			return !h.defaultExpiration.absolute.IsZero()
+			return h.defaultExpiration.duration == 3*time.Second
 		})
 	}
 
@@ -100,7 +100,15 @@ func TestHoard_SetExpires(t *testing.T) {
 	item, _ := h.cacheGet("key")
 	if assert.NotNil(t, &item) {
 		if assert.NotNil(t, item.expiration, "Expiration should be set") {
-			assert.Equal(t, date, item.expiration.absolute)
+			assert.Equal(t, date, item.expiration.date)
+		}
+	}
+
+	// the expiratoin cache item should have its absolute expiration set to the date value as well
+	expirationItem := h.expirationCache["key"]
+	if assert.NotNil(t, &expirationItem) {
+		if assert.NotNil(t, expirationItem.expiration, "Expiration should be set") {
+			assert.Equal(t, date, expirationItem.expiration.absolute)
 		}
 	}
 
@@ -126,11 +134,12 @@ func TestHoard_ExpirationSetting(t *testing.T) {
 
 	assert.Equal(t, result, "second")
 	assert.NotEqual(t, 0, h.cache["key2"].expiration.idle)
-	assert.Condition(t, func() bool {
-		return !h.cache["key2"].expiration.absolute.IsZero()
-	})
+	assert.NotEqual(t, 0, h.cache["key2"].expiration.duration)
 	assert.Condition(t, func() bool {
 		return h.cache["key2"].expiration.condition != nil
+	})
+	assert.Condition(t, func() bool {
+		return !h.cache["key2"].expiration.absolute.IsZero()
 	})
 
 }

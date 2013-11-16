@@ -20,7 +20,14 @@ type Expiration struct {
 	// idle is the sliding window duration for expiration.
 	idle time.Duration
 
-	// absolute is the absolute expiration time.
+	// duration is the expiration time to pass after the object has been added to the cache
+	duration time.Duration
+
+	// date is an specific point in time to expire at
+	date time.Time
+
+	// absolute is the absolute point in time, used for fast comparation.
+	// its the earliest resulting time from idle, duration or date.
 	absolute time.Time
 
 	// condition is a function provided by the creator which is called to
@@ -37,8 +44,63 @@ func Expires() *Expiration {
 	return new(Expiration)
 }
 
+// updateAbsoluteTime sets the internal absolute field to the earliest point
+// in time resulting from idle, duration or date.
+func (e *Expiration) updateAbsoluteTime(lastAccess, created time.Time) *Expiration {
+	abs := e.date
+	if e.idle != 0 {
+		if t := lastAccess.Add(e.idle); t.Before(abs) || abs.IsZero() {
+			abs = t
+		}
+	}
+	if e.duration != 0 {
+		if t := created.Add(e.duration); t.Before(abs) || abs.IsZero() {
+			abs = t
+		}
+	}
+	e.absolute = abs
+	return e
+}
+
+// isExpiredAbsolute is a quicker variant of IsExpired, but only works if the internal absolute time has been set,
+// i.e. the Expiration must have been created by calling getAbsoluteExpiration()
+func (e *Expiration) isExpiredAbsolute(currentTime time.Time) bool {
+
+	if !e.absolute.IsZero() && currentTime.After(e.absolute) {
+		return true
+	}
+	if e.condition != nil && e.condition() {
+		return true
+	}
+	return false
+}
+
+// IsExpired determines if an expiration object has expired due to the
+// lastAccess time, the creation time, an absolute point in time or an expiration condition.
+func (e *Expiration) IsExpired(lastAccess, created time.Time) bool {
+	currentTime := time.Now()
+
+	if e.duration != 0 && currentTime.Sub(created) > e.duration {
+		return true
+	}
+	if e.idle != 0 && currentTime.Sub(lastAccess) > e.idle {
+		return true
+	}
+	if !e.date.IsZero() && currentTime.After(e.date) {
+		return true
+	}
+	if e.condition != nil && e.condition() {
+		return true
+	}
+	return false
+}
+
 // IsExpiredByTime determines if an expiration object has expired due to the
 // lastAccess time and the current time.
+//
+// Depracted, only there for downward compatibility reasons, because it fails to deal with pure durations
+// set with AfterSeconds(), AfterMinutes() etc.
+// Use IsExpired instead
 func (e *Expiration) IsExpiredByTime(lastAccess, currentTime time.Time) bool {
 	if e.idle != 0 {
 		if currentTime.Sub(lastAccess) >
@@ -46,8 +108,8 @@ func (e *Expiration) IsExpiredByTime(lastAccess, currentTime time.Time) bool {
 			return true
 		}
 	}
-	if !e.absolute.IsZero() {
-		if currentTime.After(e.absolute) {
+	if !e.date.IsZero() {
+		if currentTime.After(e.date) {
 			return true
 		}
 	}
@@ -71,70 +133,65 @@ func (e *Expiration) IsExpiredByCondition() bool {
 }
 
 // after creates a time.Time from the duration and multiplier provided.
-func (e *Expiration) after(duration int64, multiplier time.Duration) time.Time {
-	return time.Now().Add(time.Duration(duration) * multiplier)
+func (e *Expiration) after(duration int64, multiplier time.Duration) time.Duration {
+	return time.Duration(duration) * multiplier
 }
 
 // AfterSeconds expires the item after "seconds" seconds have passed.
 func (e *Expiration) AfterSeconds(seconds int64) *Expiration {
-	e.absolute = e.after(seconds, time.Second)
+	e.duration = e.after(seconds, time.Second)
 	return e
 }
 
 // AfterMinutes expires the item after "minutes" minutes have passed.
 func (e *Expiration) AfterMinutes(minutes int64) *Expiration {
-	e.absolute = e.after(minutes, time.Minute)
+	e.duration = e.after(minutes, time.Minute)
 	return e
 }
 
 // AfterHours expires the item after "hours" hours have passed.
 func (e *Expiration) AfterHours(hours int64) *Expiration {
-	e.absolute = e.after(hours, time.Hour)
+	e.duration = e.after(hours, time.Hour)
 	return e
 }
 
 // AfterDays expires the item after "days" days have passed.
 func (e *Expiration) AfterDays(days int64) *Expiration {
-	e.absolute = e.after(days, time.Hour*24)
+	e.duration = e.after(days, time.Hour*24)
 	return e
 }
 
 // AfterDuration expires the item after "duration" duration has passed.
 func (e *Expiration) AfterDuration(duration time.Duration) *Expiration {
-	e.absolute = time.Now().Add(duration)
+	e.duration = duration
 	return e
-}
-
-// afterIdle does the work for each After*Idle method.
-func (e *Expiration) afterIdle(duration int64, multiplier time.Duration) time.Duration {
-	return time.Duration(duration) * multiplier
 }
 
 // AfterSecondsIdle expires the item if it hasn't been accessed for
 // "seconds" seconds.
 func (e *Expiration) AfterSecondsIdle(seconds int64) *Expiration {
-	e.idle = e.afterIdle(seconds, time.Second)
+	e.idle = e.after(seconds, time.Second)
 	return e
 }
 
 // AfterMinutesIdle expires the item if it hasn't been accessed for
 // "minutes" minutes.
 func (e *Expiration) AfterMinutesIdle(minutes int64) *Expiration {
-	e.idle = e.afterIdle(minutes, time.Minute)
+	e.idle = e.after(minutes, time.Minute)
 	return e
 }
 
 // AfterHoursIdle expires the item if it hasn't been accessed for
 // "hours" hours.
 func (e *Expiration) AfterHoursIdle(hours int64) *Expiration {
-	e.idle = e.afterIdle(hours, time.Hour)
+	e.idle = e.after(hours, time.Hour)
 	return e
 }
 
 // AfterDaysIdle expires the item if it hasn't been accessed for
 // "days" days.
 func (e *Expiration) AfterDaysIdle(days int64) *Expiration {
-	e.idle = e.afterIdle(days, time.Hour*24)
+	e.idle = e.after(days, time.Hour*24)
 	return e
 }
 
@@ -147,7 +204,7 @@ func (e *Expiration) AfterDurationIdle(duration time.Duration) *Expiration {
 
 // OnDate expires the item once "date" date has passed.
 func (e *Expiration) OnDate(date time.Time) *Expiration {
-	e.absolute = date
+	e.date = date
 	return e
 }
 

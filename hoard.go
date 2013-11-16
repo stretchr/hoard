@@ -7,8 +7,6 @@ import (
 
 // container contains the cached data as well as metadata for the caching engine.
 type container struct {
-	// key is the string key at which this object is cached.
-	key string
 
 	// data is the actual cached data.
 	data interface{}
@@ -16,8 +14,33 @@ type container struct {
 	// accessed is the time this entry was last accessed.
 	accessed time.Time
 
+	// created is the time this entry was added to the cache
+	created time.Time
+
 	// expiration holds the expiration properties for this object.
 	expiration *Expiration
+}
+
+// expirationContainer only contains the metadata for the caching engine
+type expirationContainer struct {
+
+	// accessed is the time this entry was last accessed.
+	accessed time.Time
+
+	// created is the time this entry was added to the cache
+	created time.Time
+
+	// expiration holds the expiration properties for this object.
+	expiration *Expiration
+}
+
+// cloneExpirationContainer returns a copy of the container without the data payload
+func (c *container) cloneExpirationContainer() expirationContainer {
+	return expirationContainer{
+		accessed:   c.accessed,
+		created:    c.created,
+		expiration: c.expiration,
+	}
 }
 
 // Hoard is the object through which all caching happens.
@@ -32,7 +55,7 @@ type Hoard struct {
 	cache map[string]container
 
 	// expirationCache is a map containing container objects.
-	expirationCache map[string]container
+	expirationCache map[string]expirationContainer
 
 	// defaultExpiration is an expiration object applied to all objects that
 	// do not explicitly provide an expiration.
@@ -59,6 +82,9 @@ type Hoard struct {
 
 	// keyDeadbolt provides thread safety for the keyDeadbolts map
 	keyDeadbolt sync.Mutex
+
+	// interval between expiration checks performed by startFlushManager()
+	expirationCheckInterval time.Duration
 }
 
 // startFlushManager starts the ticker to check for expired objects and
@@ -68,11 +94,10 @@ func (h *Hoard) startFlushManager() {
 	if !h.getTickerRunning() {
 		h.setTickerRunning(true)
 
-		h.ticker = time.NewTicker(1 * time.Second)
+		h.ticker = time.NewTicker(h.expirationCheckInterval)
 
 		go func() {
 			for currentTime := range h.ticker.C {
-
 				var expirations []string
 
 				if len(h.expirationCache) != 0 {
@@ -82,7 +107,7 @@ func (h *Hoard) startFlushManager() {
 					for key, value := range h.expirationCache {
 
 						if value.expiration != nil {
-							if value.expiration.IsExpiredByTime(value.accessed, currentTime) {
+							if value.expiration.isExpiredAbsolute(currentTime) {
 								expirations = append(expirations, key)
 							}
 						}
@@ -120,7 +145,6 @@ func (h *Hoard) expireInternal(key string) {
 
 // cacheGet retrieves an object from the cache atomically.
 func (h *Hoard) cacheGet(key string) (container, bool) {
-
 	h.cacheDeadbolt.RLock()
 	object, ok := h.cache[key]
 	h.cacheDeadbolt.RUnlock()
@@ -129,56 +153,24 @@ func (h *Hoard) cacheGet(key string) (container, bool) {
 
 // cacheSet sets an object in the cache atomically.
 func (h *Hoard) cacheSet(key string, object container) {
-
 	h.cacheDeadbolt.Lock()
 	h.cache[key] = object
 	h.cacheDeadbolt.Unlock()
 
 }
 
-// keyDeadboltsCreate creates a new deadbolt in the map
-func (h *Hoard) keyDeadboltsCreate(key string) {
-
-	h.keyDeadbolt.Lock()
-	var newMutex sync.Mutex
-	h.keyDeadbolts[key] = &newMutex
-	h.keyDeadbolt.Unlock()
-
-}
-
-// keyDeadboltsGet creates a new deadbolt in the map
-func (h *Hoard) keyDeadboltsGet(key string) (*sync.Mutex, bool) {
-
-	h.keyDeadbolt.Lock()
-	object, ok := h.keyDeadbolts[key]
-	h.keyDeadbolt.Unlock()
-
-	return object, ok
-}
-
-// keyDeadboltsDelete deletes an unneeded deadbolt
-func (h *Hoard) keyDeadboltsDelete(key string) {
-
-	h.keyDeadbolt.Lock()
-	delete(h.keyDeadbolts, key)
-	h.keyDeadbolt.Unlock()
-
-}
-
-// expirationCacheGet retrieves an object from the expirationCache atomically.
-func (h *Hoard) expirationCacheGet(key string) (container, bool) {
-
-	h.expirationDeadbolt.RLock()
-	object, ok := h.expirationCache[key]
-	h.expirationDeadbolt.RUnlock()
-	return object, ok
-}
-
 // expirationCacheSet sets an object in the expirationCache atomically.
 func (h *Hoard) expirationCacheSet(key string, object container) {
 
+	// get expiratíonConatiner without data payload
+	expirationContainer := object.cloneExpirationContainer()
+
+	// make sure the expiration has set its absolute time correctly.
+	// Because expiration is a pointer to an expiration shared with the object in normal cache, both will be updated
+	expirationContainer.expiration.updateAbsoluteTime(object.accessed, object.created)
+
 	h.expirationDeadbolt.Lock()
-	h.expirationCache[key] = object
+	h.expirationCache[key] = expirationContainer
 	h.expirationDeadbolt.Unlock()
 
 }
@@ -216,12 +208,25 @@ func Make(defaultExpiration *Expiration) *Hoard {
 	h := new(Hoard)
 
 	h.cache = make(map[string]container)
-	h.expirationCache = make(map[string]container)
+	h.expirationCache = make(map[string]expirationContainer)
 	h.defaultExpiration = defaultExpiration
 	h.keyDeadbolts = make(map[string]*sync.Mutex)
+	h.expirationCheckInterval = time.Second
 
 	return h
 
+}
+
+// SetExpirationCheckInterval sets the time interval to wait between checking
+// all expirable objects in the cache  and flushing expired ones.
+//
+// Default is one second.
+//
+// This function will not change an already running ticker, it should therefore
+// preferably be called right after Make()
+func (h *Hoard) SetExpirationCheckInterval(d time.Duration) *Hoard {
+	h.expirationCheckInterval = d
+	return h
 }
 
 // Get retrieves data from the cache using the key provided.
@@ -249,8 +254,8 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
-			if object.expiration.IsExpiredByCondition() {
-				Remove(object.key)
+			if object.expiration.IsExpired(object.accessed, object.created) { // need to check for expiration by time and condition, because h.expirationCheckInterval could be relatively large compared to objects expire time
+				Remove(key)
 				expired = true
 			}
 		}
@@ -273,16 +278,22 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	h.keyDeadbolt.Lock()
 	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
 		if _, exists := h.keyDeadbolts[key]; !exists {
-			var mutex sync.Mutex
-			h.keyDeadbolts[key] = &mutex
+			h.keyDeadbolts[key] = &sync.Mutex{}
 		}
 	}
-	h.keyDeadbolt.Unlock()
 
 	keyDeadbolt := h.keyDeadbolts[key]
+	h.keyDeadbolt.Unlock()
 
 	// defer the unlock to account for early exits.
-	defer keyDeadbolt.Unlock()
+	defer func() {
+		keyDeadbolt.Unlock()
+
+		// delete key specific deadbolt to avoid mutexes piling up
+		h.keyDeadbolt.Lock()
+		delete(h.keyDeadbolts, key)
+		h.keyDeadbolt.Unlock()
+	}()
 
 	// We need to lock this section to prevent multiple threads from calling
 	// the getter method more than once
@@ -295,8 +306,8 @@ func (h *Hoard) Get(key string, dataGetter ...DataGetter) interface{} {
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
-			if object.expiration.IsExpiredByCondition() {
-				Remove(object.key)
+			if object.expiration.IsExpired(object.accessed, object.created) { // need to check for expiration by time and condition, because h.expirationCheckInterval could be relatively large compared to objects expire time
+				Remove(key)
 				ok = false
 			}
 		}
@@ -343,8 +354,8 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
-			if object.expiration.IsExpiredByCondition() {
-				Remove(object.key)
+			if object.expiration.IsExpired(object.accessed, object.created) { // need to check for expiration by time and condition, because h.expirationCheckInterval could be relatively large compared to objects expire time
+				Remove(key)
 				expired = true
 			}
 		}
@@ -359,7 +370,6 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 		if object.expiration != nil && object.expiration != ExpiresNever {
 			h.expirationCacheSet(key, object)
 		}
-
 		return data, nil
 	}
 
@@ -367,16 +377,21 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 	h.keyDeadbolt.Lock()
 	if _, keyDeadboltExists := h.keyDeadbolts[key]; !keyDeadboltExists {
 		if _, exists := h.keyDeadbolts[key]; !exists {
-			var mutex sync.Mutex
-			h.keyDeadbolts[key] = &mutex
+			h.keyDeadbolts[key] = &sync.Mutex{}
 		}
 	}
+	keyDeadbolt := h.keyDeadbolts[key]
 	h.keyDeadbolt.Unlock()
 
-	keyDeadbolt := h.keyDeadbolts[key]
-
 	// defer the unlock to account for early exits.
-	defer keyDeadbolt.Unlock()
+	defer func() {
+		keyDeadbolt.Unlock()
+
+		// delete key specific deadbolt to avoid mutexes piling up
+		h.keyDeadbolt.Lock()
+		delete(h.keyDeadbolts, key)
+		h.keyDeadbolt.Unlock()
+	}()
 
 	// We need to lock this section to prevent multiple threads from calling
 	// the getter method more than once
@@ -389,8 +404,8 @@ func (h *Hoard) GetWithError(key string, dataGetterWithError ...DataGetterWithEr
 	if ok {
 		// The object exists, but may be expired
 		if object.expiration != nil {
-			if object.expiration.IsExpiredByCondition() {
-				Remove(object.key)
+			if object.expiration.IsExpired(object.accessed, object.created) { // need to check for expiration by time and condition, because h.expirationCheckInterval could be relatively large compared to objects expire time
+				Remove(key)
 				ok = false
 			}
 		}
@@ -437,10 +452,10 @@ func (h *Hoard) Set(key string, object interface{}, expiration ...*Expiration) {
 		exp = expiration[0]
 	}
 
-	containerObject := container{key, object, time.Now(), exp}
+	containerObject := container{object, time.Now(), time.Now(), exp}
 	h.cacheSet(key, containerObject)
 
-	if exp != ExpiresNever {
+	if exp != nil && exp != ExpiresNever {
 		h.expirationCacheSet(key, containerObject)
 		h.startFlushManager()
 	}
