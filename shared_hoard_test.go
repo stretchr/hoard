@@ -86,7 +86,15 @@ func TestShared_SetExpires(t *testing.T) {
 	item, _ := Shared().cacheGet("key")
 	if assert.NotNil(t, &item) {
 		if assert.NotNil(t, item.expiration, "Expiration should be set") {
-			assert.Equal(t, date, item.expiration.absolute)
+			assert.Equal(t, date, item.expiration.date)
+		}
+	}
+
+	// the expiratoin cache item should have its absolute expiration set to the date value as well
+	expirationItem := Shared().expirationCache["key"]
+	if assert.NotNil(t, &expirationItem) {
+		if assert.NotNil(t, expirationItem.expiration, "Expiration should be set") {
+			assert.Equal(t, date, expirationItem.expiration.absolute)
 		}
 	}
 
@@ -113,11 +121,12 @@ func TestShared_ExpirationSetting(t *testing.T) {
 
 	assert.Equal(t, result, "second")
 	assert.NotEqual(t, 0, Shared().cache["key2"].expiration.idle)
-	assert.Condition(t, func() bool {
-		return !Shared().cache["key2"].expiration.absolute.IsZero()
-	})
+	assert.NotEqual(t, 0, Shared().cache["key2"].expiration.duration)
 	assert.Condition(t, func() bool {
 		return Shared().cache["key2"].expiration.condition != nil
+	})
+	assert.Condition(t, func() bool {
+		return !Shared().cache["key2"].expiration.absolute.IsZero()
 	})
 
 }
