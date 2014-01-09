@@ -158,7 +158,7 @@ If you are using the special `Get` alternative, then you return the `Expiration`
         // get the object and return it
         obj, err := SomeExpensiveFunctionToGetTheObject()
       
-        // return the object (and tell it to never expire)
+        // return the object (and tell it to expire after 20 seconds)
         return obj, err, hoard.Expires().AfterSeconds(20)
       
       }).(*Something)
